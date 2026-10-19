@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Drop</title>
+  <meta name="theme-color" content="#0b1b4d">
+  <link rel="icon" href="icons/icon-192.png">
+</head>
+<body>
+  <!-- Loading screen: shown while the island is being built -->
+  <div id="loading" class="screen loading">
+    <div class="logo">PROJECT <span>DROP</span></div>
+    <div class="loading-bar"><div></div></div>
+    <div class="loading-text">Building the island…</div>
+  </div>
+
+  <!-- Main menu (the island slowly turns behind it) -->
+  <div id="mainMenu" class="screen menu" hidden>
+    <div class="menu-top">
+      <div class="logo">PROJECT <span>DROP</span></div>
+      <div class="tag">Working title · Build 1: the island</div>
+    </div>
+    <div class="menu-bottom">
+      <div class="controls-card">
+        <h3>Controls</h3>
+        <dl>
+          <dt>Move</dt><dd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dd>
+          <dt>Look</dt><dd>Mouse</dd>
+          <dt>Jump</dt><dd><kbd>Space</kbd></dd>
+          <dt>Sprint</dt><dd><kbd>Shift</kbd></dd>
+          <dt>Crouch</dt><dd><kbd>C</kbd></dd>
+          <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
+        </dl>
+      </div>
+      <button id="playBtn" class="play-btn">PLAY</button>
+    </div>
+  </div>
+
+  <!-- Pause menu -->
+  <div id="pauseMenu" class="screen pause" hidden>
+    <div class="pause-card">
+      <h2>PAUSED</h2>
+      <button id="resumeBtn" class="play-btn small">RESUME</button>
+      <button id="menuBtn" class="ghost-btn">Main menu</button>
+      <div id="pauseHint" class="hint"></div>
+    </div>
+  </div>
+
+  <!-- HUD: everything you see while playing -->
+  <div id="hud" hidden>
+    <div class="compass"><div id="compassStrip" class="compass-strip"></div><div class="compass-needle"></div></div>
+    <div id="fps" class="fps"></div>
+    <div class="crosshair"><i></i><i></i><i></i><i></i></div>
+
+    <div class="vitals">
+      <div class="bar shield"><span class="num" id="shieldNum">0</span><div class="track"><div class="fill" id="shieldFill"></div></div></div>
+      <div class="bar health"><span class="num" id="healthNum">100</span><div class="track"><div class="fill" id="healthFill"></div></div></div>
+    </div>
+
+    <div class="loadout">
+      <div class="mats">
+        <div class="mat wood"><i></i><span id="matWood">0</span></div>
+        <div class="mat stone"><i></i><span id="matStone">0</span></div>
+        <div class="mat metal"><i></i><span id="matMetal">0</span></div>
+      </div>
+      <div class="hotbar" id="hotbar">
+        <div class="slot pick selected"><span class="key">1</span><span class="label">Pickaxe</span></div>
+        <div class="slot"><span class="key">2</span></div>
+        <div class="slot"><span class="key">3</span></div>
+        <div class="slot"><span class="key">4</span></div>
+        <div class="slot"><span class="key">5</span></div>
+        <div class="slot"><span class="key">6</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
