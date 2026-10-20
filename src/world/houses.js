@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { SETTINGS } from '../settings.js';
+import { bakeMesh } from '../core/bake.js';
 
 const WALL_COLORS = ['#f3d9a4', '#e9b9a3', '#bcd9ec', '#d6e8b5', '#f0e6d8'];
 const ROOF_COLORS = ['#c8513f', '#4a6fb0', '#3f8f6b', '#8a5a3c'];
@@ -95,6 +96,11 @@ export function buildHouse(scene, physics, spot, rng) {
   box(2.0, 0.6, 1.2, 2.8, 0.6, -3.9, '#5470c6');    // bed
   box(0.9, 1.8, 0.6, 3.6, 1.2, 2.5, '#6b4a2b');     // cupboard
 
+  // Merge all the pieces into one shape so the whole house is drawn in one go (see core/bake.js).
+  const baked = bakeMesh(group);
+  group.clear();
+  group.add(baked);
+
   // A footprint used to keep trees and rocks out of (and next to) the house.
-  return { x: spot.x, z: spot.z, radius: 11, floorY: spot.h + 0.3 };
+  return { x: spot.x, z: spot.z, radius: 11, floorY: spot.h + 0.3, rotY: spot.rotY };
 }

@@ -3,6 +3,7 @@
    ===================================================================== */
 import * as THREE from 'three';
 import { SETTINGS } from '../settings.js';
+import { bakeGeometry } from '../core/bake.js';
 
 const SKY_TOP = new THREE.Color('#3d8bff');
 const SKY_HORIZON = new THREE.Color('#bfe4ff');
@@ -51,18 +52,21 @@ export function buildSky(scene, rng) {
 
   // Puffy low-poly clouds drifting slowly.
   const clouds = new THREE.Group();
-  const cloudMat = new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true, emissive: '#dfefff', emissiveIntensity: 0.35 });
+  const cloudMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: '#dfefff', emissiveIntensity: 0.35 });
+  const puffMat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
   const puff = new THREE.IcosahedronGeometry(1, 0);
   for (let i = 0; i < 26; i++) {
-    const cloud = new THREE.Group();
+    // Each cloud is a few puffs, merged into one shape (faster to draw)
+    const puffs = new THREE.Group();
     const parts = 3 + Math.floor(rng() * 4);
     for (let p = 0; p < parts; p++) {
-      const m = new THREE.Mesh(puff, cloudMat);
+      const m = new THREE.Mesh(puff, puffMat);
       const s = 6 + rng() * 8;
       m.scale.set(s * 1.4, s * 0.7, s);
       m.position.set(p * 9 - parts * 4, rng() * 3, (rng() - 0.5) * 8);
-      cloud.add(m);
+      puffs.add(m);
     }
+    const cloud = new THREE.Mesh(bakeGeometry(puffs), cloudMat);
     const angle = rng() * Math.PI * 2, dist = 80 + rng() * 380;
     cloud.position.set(Math.cos(angle) * dist, 95 + rng() * 45, Math.sin(angle) * dist);
     clouds.add(cloud);
