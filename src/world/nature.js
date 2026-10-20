@@ -3,7 +3,8 @@
    Hundreds of copies of the same shape are drawn with "InstancedMesh":
    the graphics card draws them all in one go, which keeps the game fast.
    Each tree and rock also gets a physics collider so you bump into it.
-   They're stored in lists so later builds can harvest them for materials.
+   They're stored in lists (with their collider and instanced copies) so
+   the pickaxe can harvest them for materials (see building/harvest.js).
    ===================================================================== */
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -56,12 +57,14 @@ export function buildTrees(scene, physics, field, rng, isFree) {
     dummy.scale.set(scale, trunkHeight, scale);
     dummy.updateMatrix();
     trunks.setMatrixAt(i, dummy.matrix);
-    trees.push({ x: s.x, y: s.y, z: s.z, kind: s.kind, scale });
 
     // Trunk collider: an upright cylinder
-    physics.createCollider(
+    const collider = physics.createCollider(
       RAPIER.ColliderDesc.cylinder(trunkHeight / 2, 0.38 * scale).setTranslation(s.x, s.y + trunkHeight / 2, s.z),
     );
+    // parts: which instanced copies draw this tree (so harvesting can shake or hide them)
+    s.tree = { x: s.x, y: s.y, z: s.z, kind: s.kind, scale, collider, parts: [{ mesh: trunks, index: i }] };
+    trees.push(s.tree);
   });
 
   pines.forEach((s, i) => {
@@ -72,6 +75,7 @@ export function buildTrees(scene, physics, field, rng, isFree) {
     coneLow.setMatrixAt(i, dummy.matrix); coneLow.setColorAt(i, color);
     dummy.position.set(s.x, base + 2.2 * sc, s.z); dummy.scale.set(1.6 * sc, 2.8 * sc, 1.6 * sc); dummy.updateMatrix();
     coneHigh.setMatrixAt(i, dummy.matrix); coneHigh.setColorAt(i, color.offsetHSL(0, 0, 0.05));
+    s.tree.parts.push({ mesh: coneLow, index: i }, { mesh: coneHigh, index: i });
   });
 
   rounds.forEach((s, i) => {
@@ -82,6 +86,7 @@ export function buildTrees(scene, physics, field, rng, isFree) {
     dummy.scale.set(2.2 * sc, 1.9 * sc, 2.2 * sc);
     dummy.updateMatrix();
     balls.setMatrixAt(i, dummy.matrix); balls.setColorAt(i, color);
+    s.tree.parts.push({ mesh: balls, index: i });
   });
 
   scene.add(trunks, coneLow, coneHigh, balls);
@@ -101,8 +106,8 @@ export function buildRocks(scene, physics, field, rng, isFree) {
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
     mesh.setColorAt(i, color.set('#9a9ca3').offsetHSL(0, 0, (rng() - 0.5) * 0.12));
-    physics.createCollider(RAPIER.ColliderDesc.ball(size * 0.85).setTranslation(s.x, s.y + size * 0.25, s.z));
-    rocks.push({ x: s.x, y: s.y, z: s.z, size });
+    const collider = physics.createCollider(RAPIER.ColliderDesc.ball(size * 0.85).setTranslation(s.x, s.y + size * 0.25, s.z));
+    rocks.push({ x: s.x, y: s.y, z: s.z, size, collider, parts: [{ mesh, index: i }] });
   });
   scene.add(mesh);
   return rocks;

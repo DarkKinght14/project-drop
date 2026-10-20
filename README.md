@@ -20,6 +20,9 @@ A single-player, offline, 3D battle royale for the browser, inspired by the genr
 | Space | Jump |
 | Shift | Sprint |
 | C | Crouch |
+| Z / X / V / F | Build mode: wall / floor / stairs / roof (click or hold to build) |
+| R (in build mode) | Switch material: wood → stone → metal |
+| 1–6 (in build mode) | Back to your weapons |
 | M | Mute |
 | Esc | Pause |
 
@@ -27,7 +30,7 @@ A single-player, offline, 3D battle royale for the browser, inspired by the genr
 
 1. ✅ The island and your character
 2. ✅ Shooting and loot: 5 weapons in 5 rarities, chests, ammo, healing, practice range
-3. Building
+3. ✅ Building: harvest wood/stone/metal, build walls, floors, stairs and roofs
 4. Smart AI bots
 5. The full battle royale match (bus, glider, storm)
 6. Polish: models, sound, effects, settings

@@ -110,6 +110,68 @@ try {
   const healed = (await game(() => window.__game.player())).health;
   console.log(`healing: ${Math.round(hurtHealth)} -> ${Math.round(healed)} health`);
   if (!(healed > hurtHealth)) fail('bandages did not heal');
+
+  // Mini shields: hold the mouse to drink them one after another (up to 50 shield)
+  await game(() => window.__game.giveHeal('smallShield', 3));
+  inv = await game(() => window.__game.inventory());
+  const miniSlot = inv.slots.findIndex((s) => s && s.type === 'smallShield');
+  await page.keyboard.press(`Digit${miniSlot + 2}`);
+  await page.waitForTimeout(400);
+  await page.mouse.down();
+  await page.waitForFunction(() => window.__game.player().shield >= 50, null, { timeout: 30000 }).catch(() => {});
+  await page.mouse.up();
+  const afterMinis = await game(() => ({ shield: window.__game.player().shield, inv: window.__game.inventory() }));
+  console.log(`mini shields: shield ${afterMinis.shield}, ${afterMinis.inv.slots[miniSlot]?.count ?? 0} left`);
+  if (afterMinis.shield !== 50) fail('holding the mouse did not drink two mini shields');
+
+  // ---------- Build 3: harvesting and building ----------
+  await game(() => window.__game.goToTree());
+  await page.keyboard.press('Digit1'); // pickaxe
+  await page.waitForTimeout(400);
+  await page.mouse.down();
+  await page.waitForFunction(() => window.__game.materials().wood >= 20, null, { timeout: 30000 }).catch(() => {});
+  await page.mouse.up();
+  const wood = (await game(() => window.__game.materials())).wood;
+  console.log(`harvesting: ${wood} wood`);
+  if (wood < 20) fail('the pickaxe did not harvest wood from a tree');
+
+  await game(() => { window.__game.respawn(); window.__game.setMaterials({ wood: 200, stone: 50 }); });
+  await page.waitForTimeout(500);
+  await page.keyboard.press('KeyZ'); // wall
+  await page.waitForTimeout(300);
+  const mode = await game(() => window.__game.buildMode());
+  if (!mode.active) fail('Z did not enter build mode');
+  if (mode.reason) console.log(`(build target not allowed: ${mode.reason})`);
+  await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();
+  await page.waitForTimeout(300);
+  await page.keyboard.press('KeyV'); // stairs, to the side
+  await game(() => { /* look left a little */ });
+  await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();
+  await page.waitForTimeout(300);
+  await page.keyboard.press('KeyR'); // stone
+  await page.keyboard.press('KeyX'); // floor
+  await page.waitForTimeout(200);
+  await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: 'tests/output/building.png' });
+  let builds = await game(() => window.__game.builds());
+  const mats = await game(() => window.__game.materials());
+  console.log(`building: ${builds.map((b) => b.mat + ' ' + b.type).join(', ')}; ${mats.wood} wood, ${mats.stone} stone left`);
+  if (builds.length < 2) fail('could not place build pieces');
+  if (mats.wood >= 200) fail('building did not cost materials');
+
+  // Leave build mode with the rifle and shoot the wall down
+  await page.keyboard.press(`Digit${arSlot + 2}`);
+  await page.waitForTimeout(300);
+  if ((await game(() => window.__game.buildMode())).active) fail('pressing a slot key did not leave build mode');
+  const wallBefore = builds.find((b) => b.type === 'wall');
+  await page.mouse.down();
+  await page.waitForTimeout(1500);
+  await page.mouse.up();
+  builds = await game(() => window.__game.builds());
+  const wallAfter = builds.find((b) => b.type === 'wall');
+  console.log(`shooting the wall: ${wallBefore?.hp} -> ${wallAfter ? wallAfter.hp : 'destroyed'}`);
+  if (wallAfter && wallAfter.hp >= wallBefore.hp) fail('bullets did not damage the wall');
   if (errors.length) fail('page errors:\n  ' + errors.join('\n  '));
   if (!process.exitCode) console.log('PASS  (screenshots in tests/output/)');
 } finally {

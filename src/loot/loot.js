@@ -45,9 +45,10 @@ export class Loot {
         this.floorSpots.push({ x: p.x, y: h.floorY, z: p.z });
       }
     }
-    const { trees, rocks, houses, field } = this.world;
+    const { trees, rocks, houses, cars, field } = this.world;
     const clear = (x, z) =>
       houses.every((h) => Math.hypot(x - h.x, z - h.z) > h.radius) &&
+      cars.every((c) => Math.hypot(x - c.x, z - c.z) > 3.5) &&
       trees.every((t) => Math.hypot(x - t.x, z - t.z) > 1.6) &&
       rocks.every((r) => Math.hypot(x - r.x, z - r.z) > r.size + 1);
     const outdoor = (count, list, chest) => {

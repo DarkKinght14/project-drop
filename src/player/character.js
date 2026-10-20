@@ -91,6 +91,11 @@ export function createCharacter(outfit = OUTFIT) {
         const chop = action > 0 ? Math.sin(action * Math.PI) : 0;
         rightArm.rotation.x = -0.5 - chop * 1.9 + s * 0.3;
         leftArm.rotation.x = s * 0.8;
+      } else if (pose === 'drink') {
+        // Lift the item up to the face, with a little bob while using it
+        rightArm.rotation.x = -2.5 + Math.sin(action * Math.PI * 8) * 0.12;
+        rightArm.rotation.z = 0.45;
+        leftArm.rotation.x = -0.4;
       } else if (pose === 'item') {
         rightArm.rotation.x = -1.1;
         leftArm.rotation.x = -1.0;

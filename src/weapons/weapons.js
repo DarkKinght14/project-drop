@@ -20,8 +20,8 @@ const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Weapons {
-  constructor({ physics, player, cam, targets, loot, effects, feedback }) {
-    Object.assign(this, { physics, player, cam, targets, loot, effects, feedback });
+  constructor({ physics, player, cam, targets, loot, effects, feedback, building, harvest }) {
+    Object.assign(this, { physics, player, cam, targets, loot, effects, feedback, building, harvest });
     this.ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
     this.heldItem = undefined;  // what the hand model currently shows
     this.handModel = null;
@@ -69,6 +69,7 @@ export class Weapons {
     } else {
       this.handModel = makeHealModel(item.type);
       this.handModel.rotation.x = Math.PI / 2;
+      this.handModel.scale.setScalar(1.8); // big enough to see what you're holding
     }
     hand.add(this.handModel);
   }
@@ -76,6 +77,22 @@ export class Weapons {
   update(dt, input, camera) {
     const { player, cam } = this;
     const inv = player.inventory;
+    if (this.toast && (this.toast.time -= dt) <= 0) this.toast = null;
+
+    // ---------- Build mode: hands are busy building, no weapons ----------
+    if (this.building.active) {
+      this.cancelActions();
+      if (this.handModel) this.handModel.visible = false;
+      cam.aiming = cam.scoped = this.aiming = false;
+      player.model.root.visible = true;
+      this.spread = 0;
+      Object.assign(player, { slowdown: 1, canSprint: true, pose: 'none', pitch: cam.pitch, action: 0 });
+      if (this.building.reason === 'materials' && input.clicked.has(0)) {
+        this.say(`Not enough ${SETTINGS.building.materials[this.building.material].name.toLowerCase()}: hit trees, rocks and cars with the pickaxe`);
+      }
+      return;
+    }
+    if (this.handModel) this.handModel.visible = true;
 
     // ---------- Switching slots ----------
     const before = inv.selected;
@@ -98,7 +115,6 @@ export class Weapons {
     this.cooldown -= dt;
     this.sinceShot += dt;
     this.kick = Math.max(0, this.kick - dt * 8);
-    if (this.toast && (this.toast.time -= dt) <= 0) this.toast = null;
 
     // Recoil settles back down a little at a time
     const settle = this.recoilDebt * Math.min(1, SETTINGS.recoilRecover * dt);
@@ -119,9 +135,11 @@ export class Weapons {
     // Tell the player how to move and hold the arms
     player.slowdown = this.aiming ? SETTINGS.player.aimSpeed : this.use ? 0.7 : 1;
     player.canSprint = !this.aiming && !this.use && this.sinceShot > 0.4;
-    player.pose = isGun ? 'gun' : isHeal ? 'item' : 'pick';
+    player.pose = isGun ? 'gun' : isHeal ? (this.use ? 'drink' : 'item') : 'pick';
     player.pitch = cam.pitch;
-    player.action = isGun ? this.kick : this.swing > 0 ? 1 - this.swing / SETTINGS.pickaxe.swingTime : 0;
+    player.action = isGun ? this.kick
+      : this.use ? this.use.time / this.use.total
+      : this.swing > 0 ? 1 - this.swing / SETTINGS.pickaxe.swingTime : 0;
   }
 
   // ---------- Guns ----------
@@ -156,7 +174,7 @@ export class Weapons {
     if (P.crouch > 0.5) spread *= 0.75;
     this.spread = spread;
 
-    const wantsFire = stats.auto ? input.buttons.has(0) : input.clicked.has(0);
+    const wantsFire = stats.auto ? input.buttons.has(0) || input.clicked.has(0) : input.clicked.has(0);
     if (!wantsFire || this.cooldown > 0) return;
     if (this.reload) return; // wait for the reload to finish
     if (item.mag <= 0) {
@@ -185,6 +203,7 @@ export class Weapons {
     if (this.muzzle) this.muzzle.getWorldPosition(muzzle); else muzzle.copy(origin);
 
     const hits = new Map(); // target -> { damage, head, point }
+    const builds = new Map(); // build piece -> { damage, point }
     for (let p = 0; p < stats.pellets; p++) {
       this.spreadDirection(dir, spread, shot);
       this.ray.origin = origin;
@@ -200,12 +219,19 @@ export class Weapons {
         entry.head ||= found.head;
         hits.set(found.target, entry);
         this.effects.impact(end, '#ff7a3a', 4);
-      } else {
-        this.effects.impact(end, '#ffd27a', 5);
+        continue;
       }
+      const piece = this.building.lookup(hit.collider);
+      if (piece) {
+        const entry = builds.get(piece) || { damage: 0, point: end.clone() };
+        entry.damage += shotDamage(stats, hit.timeOfImpact, false);
+        builds.set(piece, entry);
+      }
+      this.effects.impact(end, '#ffd27a', 5);
     }
 
     for (const [target, h] of hits) this.applyHit(target, h.damage, h.head, h.point);
+    for (const [piece, h] of builds) this.hitPiece(piece, h.damage, h.point);
 
     item.mag -= 1;
     this.bloom = Math.min(2, this.bloom + SETTINGS.spreadGrow);
@@ -228,6 +254,12 @@ export class Weapons {
     else if (head) sound.headshot();
     else if (result.health > 0) sound.hit();
     else sound.shieldHit();
+  }
+
+  // Damage a build piece (yours or, later, a bot's).
+  hitPiece(piece, damage, point) {
+    const { dealt } = this.building.damage(piece, damage);
+    if (dealt > 0) this.feedback.number(point, dealt, 'build');
   }
 
   // A random direction inside a cone around "dir" (degrees = how wide the cone is).
@@ -260,12 +292,23 @@ export class Weapons {
         if (hit) {
           end.copy(origin).addScaledVector(dir, hit.timeOfImpact);
           const found = this.targets.lookup(hit.collider);
+          const piece = this.building.lookup(hit.collider);
+          const resource = this.harvest.lookup(hit.collider);
           if (found && found.target.down <= 0) this.applyHit(found.target, PX.damage, false, end.clone());
-          else { this.effects.impact(end, '#c9b48a', 6); sound.hit(); }
+          else if (piece) { this.hitPiece(piece, PX.buildDamage, end.clone()); sound.hit(); }
+          else if (resource) {
+            // Harvest: materials go straight into your pockets
+            const got = this.harvest.hit(resource, this.player.materials);
+            const color = SETTINGS.building.materials[got.material].color;
+            this.effects.impact(end, color, got.broke ? 20 : 8);
+            if (got.gained > 0) this.feedback.number(end.clone(), got.gained, got.material);
+            else this.say(`You can't carry more ${got.material}`);
+            sound.harvest(got.material);
+          } else { this.effects.impact(end, '#c9b48a', 6); sound.hit(); }
         }
       }
     }
-    if (this.swing <= 0 && input.buttons.has(0) && this.cooldown <= 0) {
+    if (this.swing <= 0 && (input.buttons.has(0) || input.clicked.has(0)) && this.cooldown <= 0) {
       this.swing = PX.swingTime;
       this.swingHit = false;
       sound.swing();
@@ -284,19 +327,25 @@ export class Weapons {
         if (H.shield) P.shield = Math.min(H.upTo, SETTINGS.player.maxShield, P.shield + H.shield);
         P.inventory.consumeCurrent();
         this.use = null;
+        this.cooldown = SETTINGS.healChainDelay; // short pause, then the next one if you keep holding
         sound.healDone();
+        this.say(H.shield ? `+${H.shield} shield` : H.health >= 100 ? 'Health fully restored' : `+${H.health} health`);
       }
       return;
     }
-    if (!input.clicked.has(0)) return;
+    // Click to use one; keep holding to use the next one straight after
+    const wants = input.clicked.has(0) || (input.buttons.has(0) && this.cooldown <= 0);
+    if (!wants) return;
     // Don't waste an item that wouldn't help
     if (H.health && P.health >= Math.min(H.upTo, SETTINGS.player.maxHealth)) {
-      this.say(H.upTo < 100 ? `${H.name} can only heal you up to ${H.upTo} health` : 'Health is full'); return;
+      if (input.clicked.has(0)) this.say(H.upTo < 100 ? `${H.name} only heal up to ${H.upTo} health. Use a Med Kit for more.` : 'Health is already full');
+      return;
     }
     if (H.shield && P.shield >= H.upTo) {
-      this.say(H.upTo < 100 ? `${H.name} can only fill your shield up to ${H.upTo}` : 'Shield is full'); return;
+      if (input.clicked.has(0)) this.say(H.upTo < 100 ? `Mini Shields only fill up to ${H.upTo}. Use a Shield Potion for more.` : 'Shield is already full');
+      return;
     }
-    this.use = { time: 0, total: H.useTime, name: H.name };
+    this.use = { time: 0, total: H.useTime, name: `Using ${H.name}` };
   }
 
   // Numbers for the HUD

@@ -88,7 +88,7 @@ export const SETTINGS = {
   spreadGrow: 0.35,         // each shot adds this much of the base spread ("bloom")
   spreadRecover: 4,         // how fast the bloom shrinks back (per second)
   recoilRecover: 6,         // how fast the view settles back after a kick
-  pickaxe: { damage: 20, range: 2.6, swingTime: 0.45 },
+  pickaxe: { damage: 20, buildDamage: 50, range: 2.6, swingTime: 0.45 },
 
   /* ---------- Healing ----------
      health / shield: how much it gives; upTo: it won't heal above this;
@@ -96,8 +96,37 @@ export const SETTINGS = {
   heals: {
     bandage:     { name: 'Bandages',      short: 'BANDAGE', color: '#f2f2f2', health: 15,  upTo: 75,  useTime: 3.5, stack: 15, rarity: 0, drop: 5 },
     medkit:      { name: 'Med Kit',       short: 'MEDKIT',  color: '#ff4d4d', health: 100, upTo: 100, useTime: 10,  stack: 3,  rarity: 1, drop: 1 },
-    smallShield: { name: 'Small Shield',  short: 'MINI',    color: '#53c7ff', shield: 25,  upTo: 50,  useTime: 2,   stack: 6,  rarity: 1, drop: 3 },
-    bigShield:   { name: 'Shield Potion', short: 'SHIELD',  color: '#2e7bff', shield: 50,  upTo: 100, useTime: 5,   stack: 3,  rarity: 2, drop: 1 },
+    smallShield: { name: 'Mini Shield',   short: 'MINI',    color: '#53c7ff', shield: 25,  upTo: 50,  useTime: 1.2, stack: 6,  rarity: 1, drop: 3 },
+    bigShield:   { name: 'Shield Potion', short: 'SHIELD',  color: '#2e7bff', shield: 50,  upTo: 100, useTime: 4,   stack: 3,  rarity: 2, drop: 1 },
+  },
+  healChainDelay: 0.25,     // hold the mouse to use the next one automatically after this pause
+
+  /* ---------- Building ----------
+     The world has an invisible grid: tiles are tile x tile meters, floors are height apart.
+     hp: a finished piece's health; buildTime: seconds to reach full health
+     (pieces start at startHealth of it and can be shot while still growing). */
+  building: {
+    tile: 4,
+    height: 3.2,
+    cost: 10,
+    startHealth: 0.1,
+    placeInterval: 0.09,    // hold the mouse to build: one piece at most this often
+    maxPieces: 300,         // per piece type and material
+    materials: {
+      wood:  { name: 'Wood',  hp: 150, buildTime: 2.5, color: '#c4874a' },
+      stone: { name: 'Stone', hp: 300, buildTime: 5,   color: '#a7abb3' },
+      metal: { name: 'Metal', hp: 500, buildTime: 8,   color: '#8297ad' },
+    },
+  },
+
+  /* ---------- Harvesting with the pickaxe ----------
+     gain: materials per hit; hits: how many hits until it breaks (scaled by size). */
+  harvest: {
+    maxMaterial: 999,
+    tree:  { material: 'wood',  gain: 10, hits: 6 },
+    rock:  { material: 'stone', gain: 10, hits: 6 },
+    car:   { material: 'metal', gain: 12, hits: 8 },
+    cars: 26,               // old cars on the island, harvested for metal
   },
 
   /* ---------- Loot spawns ---------- */

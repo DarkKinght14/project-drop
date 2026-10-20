@@ -11,6 +11,7 @@ import { makeHeightField, buildTerrain } from './terrain.js';
 import { buildSky } from './sky.js';
 import { pickHouseSpots, buildHouse } from './houses.js';
 import { buildTrees, buildRocks, buildBushes } from './nature.js';
+import { buildCars } from './props.js';
 
 export function buildWorld(scene, physics) {
   const rng = makeRandom(SETTINGS.world.seed);
@@ -32,8 +33,9 @@ export function buildWorld(scene, physics) {
   const trees = buildTrees(scene, physics, field, rng, isFree);
   const rocks = buildRocks(scene, physics, field, rng, isFree);
   buildBushes(scene, field, rng, isFree);
+  const cars = buildCars(scene, physics, field, rng, isFree, trees, rocks);
 
-  return { field, sky, houses, trees, rocks, spawn, range, heightAt: field.heightAt };
+  return { field, sky, houses, trees, rocks, cars, spawn, range, heightAt: field.heightAt };
 }
 
 // The practice range points in the flattest direction from the spawn point.

@@ -9,6 +9,7 @@ import { SETTINGS } from '../src/settings.js';
 import { makeRandom } from '../src/core/random.js';
 import { makeWeapon, makeHeal, makeAmmo, weaponStats, shotDamage, applyDamage, rollRarity, rollChestLoot, rollFloorLoot } from '../src/loot/items.js';
 import { Inventory } from '../src/player/inventory.js';
+import { facing, cellOf, levelOf, wallSlot, pickSlot } from '../src/building/grid.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -95,6 +96,51 @@ test('using healing items uses them up', () => {
   inv.select(1);
   inv.consumeCurrent();
   assert.equal(inv.slots[0], null);
+});
+
+// ---------- Building grid ----------
+const T = SETTINGS.building.tile, H = SETTINGS.building.height;
+
+test('facing picks the closest compass direction', () => {
+  assert.equal(facing(0), 'n');
+  assert.equal(facing(Math.PI), 's');
+  assert.equal(facing(Math.PI / 2), 'w');
+  assert.equal(facing(-Math.PI / 2), 'e');
+  assert.equal(facing(0.3), 'n');
+});
+
+test('two tiles share one wall spot', () => {
+  // the north edge of tile (2, 5) is the south edge of tile (2, 4)
+  assert.equal(wallSlot(2, 5, 0, 'n').key, wallSlot(2, 4, 0, 's').key);
+  assert.equal(wallSlot(2, 5, 0, 'w').key, wallSlot(1, 5, 0, 'e').key);
+  assert.notEqual(wallSlot(2, 5, 0, 'n').key, wallSlot(2, 5, 1, 'n').key);
+});
+
+test('a wall goes on the edge of your tile, in front of you', () => {
+  const s = pickSlot('wall', { x: 2, y: 0, z: 2 }, 0, 0); // standing in tile (0, 0), looking north
+  assert.equal(s.z, 0);           // the north edge
+  assert.equal(s.x, T / 2);       // centered on the tile
+  assert.equal(s.y, H / 2);       // standing on level 0
+  assert.equal(s.rotY, 0);
+});
+
+test('stairs go in the tile ahead and rise the way you look', () => {
+  const s = pickSlot('ramp', { x: 2, y: 0, z: 2 }, Math.PI / 2, 0); // looking west
+  assert.equal(cellOf(s.x, s.z).cx, -1);
+  assert.equal(s.rotY, Math.PI / 2);
+});
+
+test('looking up builds one level higher; looking down puts a floor under you', () => {
+  assert.equal(pickSlot('wall', { x: 2, y: 0, z: 2 }, 0, 0.8).level, 1);
+  const under = pickSlot('floor', { x: 2, y: H, z: 2 }, 0, -1);
+  assert.deepEqual(cellOf(under.x, under.z), { cx: 0, cz: 0 });
+  assert.equal(under.y, H);
+});
+
+test('standing on a floor counts as that level', () => {
+  assert.equal(levelOf(H + 0.1), 1);
+  assert.equal(levelOf(H - 0.3), 1); // small tolerance
+  assert.equal(levelOf(0.2), 0);
 });
 
 console.log(process.exitCode ? 'Logic tests FAILED' : `Logic tests: ${passed} passed`);

@@ -75,7 +75,8 @@ function show(id, visible) {
 
 let frames = 0, fpsTime = 0;
 // info: from weapons.hudInfo(); prompt: from loot.interact(); input: to check Tab
-export function updateHud(dt, player, cam, info, prompt, input) {
+// build: from building.hudInfo()
+export function updateHud(dt, player, cam, info, prompt, input, build) {
   const P = SETTINGS.player;
   const inv = player.inventory;
   renderHotbar(inv);
@@ -108,10 +109,29 @@ export function updateHud(dt, player, cam, info, prompt, input) {
   show('toast', !!info.toast);
   if (info.toast) setText('toast', info.toast);
 
+  // Build mode: the piece bar, and which material you're building with
+  const building = build.active;
+  $('hud').classList.toggle('building', building);
+  show('buildBar', building);
+  if (building) {
+    const color = SETTINGS.building.materials[build.material].color;
+    for (const el of document.querySelectorAll('.piece')) {
+      el.classList.toggle('selected', el.dataset.piece === build.piece);
+      el.style.setProperty('--mat', color);
+    }
+  }
+  for (const m of ['wood', 'stone', 'metal']) {
+    const el = document.querySelector('.mat.' + m);
+    el.classList.toggle('current', building && build.material === m);
+    el.classList.toggle('short', building && build.material === m && player.materials[m] < SETTINGS.building.cost);
+  }
+
   // Crosshair: the gap shows how far bullets can stray
   const crosshair = $('crosshair');
-  const gun = !!info.ammo;
-  crosshair.classList.toggle('dot', !gun);
+  const gun = !!info.ammo && !building;
+  crosshair.classList.toggle('build', building);
+  crosshair.classList.toggle('dot', !gun && !building);
+  if (building) crosshair.style.setProperty('--gap', '6px');
   crosshair.classList.toggle('hidden', info.scoped);
   if (gun) {
     const halfFov = (cam.camera.fov * Math.PI) / 360;

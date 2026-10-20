@@ -202,5 +202,36 @@ kbd {
 .backpack-ammo b { display: block; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--c); }
 .backpack .hint { margin: 14px 0 0; }
 
+/* Build mode */
+.build-bar { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.build-title { font-family: var(--display); font-size: 20px; color: var(--yellow); text-shadow: 0 2px 0 rgba(0, 0, 0, .4); }
+.build-title small { font: 600 12px var(--text); color: var(--white); opacity: .85; margin-left: 6px; }
+.build-title kbd { min-width: 18px; padding: 0 4px; font-size: 11px; }
+.build-pieces { display: flex; gap: 6px; }
+.piece {
+  position: relative; width: 64px; height: 64px; border-radius: 6px;
+  background: rgba(11, 27, 77, .55); border: 2px solid rgba(255, 255, 255, .25);
+}
+.piece.selected { border-color: var(--white); background: rgba(29, 79, 216, .7); box-shadow: 0 0 0 2px rgba(255, 255, 255, .4); }
+.piece .key { position: absolute; top: 3px; left: 6px; font: 700 12px var(--text); opacity: .8; }
+.piece .label { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font: 700 10px var(--text); letter-spacing: .06em; text-transform: uppercase; }
+.ico { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); background: var(--mat, #c4874a); }
+.ico.wall { width: 26px; height: 22px; border-radius: 2px; }
+.ico.floor { width: 30px; height: 12px; transform: translate(-50%, -50%) perspective(40px) rotateX(45deg); border-radius: 2px; }
+.ico.ramp { width: 30px; height: 22px; clip-path: polygon(0 100%, 100% 0, 100% 100%); }
+.ico.roof { width: 30px; height: 18px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+#hud.building .hotbar { opacity: .45; }
+#hud.building .ammo-info { display: none; }
+.mat { transition: transform .1s; }
+.mat.current { transform: scale(1.25); color: var(--yellow); }
+.mat.short span { color: #ff6a5a; }
+.crosshair.build i { background: var(--sky); }
+
+.dmg.build { color: #d9e6f5; font-size: 18px; }
+.dmg.wood { color: #e0a463; font-size: 22px; }
+.dmg.stone { color: #d4d8de; font-size: 22px; }
+.dmg.metal { color: #9fc1e6; font-size: 22px; }
+.dmg.wood::before, .dmg.stone::before, .dmg.metal::before { content: '+'; }
+
 .controls-card dl.two-col { grid-template-columns: auto auto auto auto; }
 .controls-card small { opacity: .7; }

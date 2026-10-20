@@ -82,5 +82,17 @@ export const sound = {
   swing: () => noise({ freq: 900, type: 'bandpass', q: 2, time: 0.15, volume: 0.2 }),
   chestOpen: () => { [523, 659, 784, 1047].forEach((f, i) => tone({ from: f, time: 0.25, volume: 0.12, wave: 'triangle', delay: i * 0.06 })); },
   healDone: () => { tone({ from: 600, to: 900, time: 0.15, volume: 0.15 }); tone({ from: 900, to: 1200, time: 0.15, volume: 0.12, delay: 0.1 }); },
+  // Building and harvesting: wood thuds, stone clacks, metal clangs
+  build: (mat) => {
+    if (mat === 'wood') { noise({ freq: 700, time: 0.12, volume: 0.45 }); tone({ from: 180, to: 120, time: 0.1, volume: 0.25, wave: 'triangle' }); }
+    else if (mat === 'stone') { noise({ freq: 1400, time: 0.14, volume: 0.45 }); tone({ from: 140, to: 90, time: 0.12, volume: 0.3 }); }
+    else { tone({ from: 520, to: 480, time: 0.25, volume: 0.15, wave: 'square' }); noise({ freq: 2500, type: 'bandpass', q: 5, time: 0.1, volume: 0.3 }); }
+  },
+  breakPiece: (mat) => { noise({ freq: mat === 'metal' ? 2200 : 900, time: 0.4, volume: 0.6 }); tone({ from: 220, to: 50, time: 0.3, volume: 0.3 }); },
+  harvest: (mat) => {
+    if (mat === 'wood') { noise({ freq: 600, type: 'bandpass', q: 2, time: 0.1, volume: 0.6 }); tone({ from: 240, to: 160, time: 0.08, volume: 0.25, wave: 'triangle' }); }
+    else if (mat === 'stone') { noise({ freq: 2600, type: 'bandpass', q: 3, time: 0.08, volume: 0.5 }); tone({ from: 900, to: 700, time: 0.05, volume: 0.12 }); }
+    else { tone({ from: 1300, to: 1200, time: 0.3, volume: 0.15, wave: 'square' }); tone({ from: 1750, to: 1700, time: 0.25, volume: 0.08 }); }
+  },
   hurt: () => { noise({ freq: 500, time: 0.15, volume: 0.5 }); tone({ from: 160, to: 70, time: 0.15, volume: 0.3 }); },
 };

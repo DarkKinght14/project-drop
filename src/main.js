@@ -22,6 +22,8 @@ import { makeWeapon, makeAmmo, makeHeal } from './loot/items.js';
 import { Targets, placeTargets } from './weapons/targets.js';
 import { Effects } from './weapons/effects.js';
 import { Weapons } from './weapons/weapons.js';
+import { Harvest } from './building/harvest.js';
+import { Building } from './building/building.js';
 import { initAudio, toggleMute } from './audio/sound.js';
 
 const $ = (id) => document.getElementById(id);
@@ -59,7 +61,9 @@ async function boot() {
   const cam = new ThirdPersonCamera(camera, physics, world);
   const effects = new Effects(scene);
   const feedback = new Feedback();
-  const weapons = new Weapons({ physics, player, cam, targets, loot, effects, feedback });
+  const harvest = new Harvest(world);
+  const building = new Building(scene, physics, world, effects);
+  const weapons = new Weapons({ physics, player, cam, targets, loot, effects, feedback, building, harvest });
   initInput(renderer.domElement);
   buildCompass();
 
@@ -73,11 +77,14 @@ async function boot() {
     $('pauseHint').textContent = '';
   }
 
-  // A new match: fresh loot, empty hands, standing at the practice range.
+  // A new match: fresh loot, empty hands, no builds, trees grown back, at the practice range.
   function newMatch() {
     player.respawn();
     player.inventory.reset();
+    player.materials = { wood: 0, stone: 0, metal: 0 };
     loot.reset(start);
+    harvest.reset();
+    building.reset();
     cam.yaw = start.yaw; cam.pitch = -0.1;
   }
 
@@ -112,7 +119,9 @@ async function boot() {
       physics.timestep = dt;
       physics.step();
       cam.update(dt, player);
+      building.update(dt, input, player, cam); // before weapons: pressing 1-6 leaves build mode first
       weapons.update(dt, input, camera);   // shoot after the camera moved, so bullets go where you see
+      harvest.update(dt);
       const prompt = loot.interact(dt, input, player, cam.forward);
       loot.update(dt, now / 1000, player);
       targets.update(dt, camera);
@@ -125,7 +134,7 @@ async function boot() {
         player.respawn();
         weapons.say('You were eliminated! Back to the start.');
       }
-      updateHud(dt, player, cam, weapons.hudInfo(), prompt, input);
+      updateHud(dt, player, cam, weapons.hudInfo(), prompt, input, building.hudInfo());
     } else if (state === 'menu') {
       cam.orbit(now / 1000);
       world.sky.update(dt, new THREE.Vector3(0, 0, 0));
@@ -165,8 +174,32 @@ async function boot() {
       player.inventory.add(makeAmmo(SETTINGS.weapons[type].ammo, 60));
     },
     giveHeal: (type, count) => player.inventory.add(makeHeal(type, count)),
+    materials: () => ({ ...player.materials }),
+    setMaterials: (m) => Object.assign(player.materials, m),
+    builds: () => [...building.slots.values()].map((p) => ({ type: p.type, mat: p.mat, hp: Math.round(p.hp), grow: p.grow })),
+    buildMode: () => ({ ...building.hudInfo(), target: building.target && { key: building.target.key, x: +building.target.x.toFixed(2), y: +building.target.y.toFixed(2), z: +building.target.z.toFixed(2), rotY: building.target.rotY } }),
+    debugBuilds: () => [...building.slots.values()].map((p) => ({ key: p.key, x: p.x, y: p.y, z: p.z, rotY: p.rotY })),
+    // Stand next to the nearest tree and face it (for testing the pickaxe)
+    goToTree: () => {
+      const f = player.feet;
+      const tree = harvest.list.filter((r) => r.type === 'tree' && r.hits < r.maxHits)
+        .sort((a, b) => Math.hypot(a.data.x - f.x, a.data.z - f.z) - Math.hypot(b.data.x - f.x, b.data.z - f.z))[0];
+      const x = tree.data.x + 1.3, z = tree.data.z;
+      const y = world.heightAt(x, z) + 1.0;
+      player.body.setTranslation({ x, y, z }, true);
+      player.position.set(x, y, z);
+      cam.yaw = Math.PI / 2; // face -X, toward the tree
+      cam.pitch = -0.05;
+      return { x: tree.data.x, z: tree.data.z };
+    },
     hurt: (amount) => player.takeDamage(amount),
     respawn: () => { player.respawn(); cam.yaw = start.yaw; },
+    teleport: (x, z, yaw) => {
+      const y = world.heightAt(x, z) + 1.0;
+      player.body.setTranslation({ x, y, z }, true);
+      player.position.set(x, y, z);
+      if (yaw !== undefined) cam.yaw = yaw;
+    },
     // Point the camera at a practice target (the camera looks along a line through the shoulder point)
     aimAt: (i) => {
       const t = targets.list[i].position;
