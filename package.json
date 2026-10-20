@@ -2,7 +2,7 @@
   "name": "project-drop",
   "version": "1.0.0",
   "scripts": {
-    "test": "node tests/smoke.mjs",
+    "test": "node tests/logic.mjs && node tests/smoke.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
