@@ -10,15 +10,23 @@ A single-player, offline, 3D battle royale for the browser, inspired by the genr
 |---|---|
 | W A S D | Move |
 | Mouse | Look |
+| Left mouse | Shoot / swing the pickaxe / use a healing item |
+| Right mouse | Aim down sights (sniper: scope) |
+| R | Reload |
+| E | Pick up (hold to open chests) |
+| 1–6 / mouse wheel | Choose a hotbar slot (1 = pickaxe) |
+| Q | Drop the selected item |
+| Tab (hold) | Backpack: items and ammo |
 | Space | Jump |
 | Shift | Sprint |
 | C | Crouch |
+| M | Mute |
 | Esc | Pause |
 
 ## Roadmap
 
 1. ✅ The island and your character
-2. Shooting and loot
+2. ✅ Shooting and loot: 5 weapons in 5 rarities, chests, ammo, healing, practice range
 3. Building
 4. Smart AI bots
 5. The full battle royale match (bus, glider, storm)
