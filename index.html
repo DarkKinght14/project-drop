@@ -19,18 +19,26 @@
   <div id="mainMenu" class="screen menu" hidden>
     <div class="menu-top">
       <div class="logo">PROJECT <span>DROP</span></div>
-      <div class="tag">Working title · Build 1: the island</div>
+      <div class="tag">Working title · Build 2: shooting &amp; loot</div>
     </div>
     <div class="menu-bottom">
       <div class="controls-card">
         <h3>Controls</h3>
-        <dl>
+        <dl class="two-col">
           <dt>Move</dt><dd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dd>
+          <dt>Shoot / swing</dt><dd>Left mouse</dd>
           <dt>Look</dt><dd>Mouse</dd>
+          <dt>Aim</dt><dd>Right mouse</dd>
           <dt>Jump</dt><dd><kbd>Space</kbd></dd>
+          <dt>Reload</dt><dd><kbd>R</kbd></dd>
           <dt>Sprint</dt><dd><kbd>Shift</kbd></dd>
+          <dt>Pick up / open</dt><dd><kbd>E</kbd> <small>(hold for chests)</small></dd>
           <dt>Crouch</dt><dd><kbd>C</kbd></dd>
+          <dt>Slots</dt><dd><kbd>1</kbd>–<kbd>6</kbd> or wheel</dd>
           <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
+          <dt>Drop item</dt><dd><kbd>Q</kbd></dd>
+          <dt>Mute</dt><dd><kbd>M</kbd></dd>
+          <dt>Backpack</dt><dd><kbd>Tab</kbd> <small>(hold)</small></dd>
         </dl>
       </div>
       <button id="playBtn" class="play-btn">PLAY</button>
@@ -49,9 +57,24 @@
 
   <!-- HUD: everything you see while playing -->
   <div id="hud" hidden>
+    <div id="hurt" class="hurt"></div>
+    <div id="scope" class="scope" hidden><i></i><i></i></div>
+    <div id="damageLayer" class="damage-layer"></div>
     <div class="compass"><div id="compassStrip" class="compass-strip"></div><div class="compass-needle"></div></div>
     <div id="fps" class="fps"></div>
-    <div class="crosshair"><i></i><i></i><i></i><i></i></div>
+    <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i><b id="hitMarker" class="hit-marker"></b></div>
+
+    <div id="toast" class="toast" hidden></div>
+    <div id="prompt" class="prompt" hidden><kbd>E</kbd><span id="promptText"></span><div class="prompt-fill" id="promptFill"></div></div>
+    <div id="progress" class="progress" hidden><div class="progress-label"><span id="progressLabel"></span><span id="progressTime"></span></div><div class="progress-track"><div id="progressFill"></div></div></div>
+
+    <div id="backpack" class="backpack" hidden>
+      <h3>Backpack</h3>
+      <div id="backpackSlots" class="backpack-slots"></div>
+      <h4>Ammo</h4>
+      <div id="backpackAmmo" class="backpack-ammo"></div>
+      <p class="hint">Select a slot and press <kbd>Q</kbd> to drop it.</p>
+    </div>
 
     <div class="vitals">
       <div class="bar shield"><span class="num" id="shieldNum">0</span><div class="track"><div class="fill" id="shieldFill"></div></div></div>
@@ -64,14 +87,8 @@
         <div class="mat stone"><i></i><span id="matStone">0</span></div>
         <div class="mat metal"><i></i><span id="matMetal">0</span></div>
       </div>
-      <div class="hotbar" id="hotbar">
-        <div class="slot pick selected"><span class="key">1</span><span class="label">Pickaxe</span></div>
-        <div class="slot"><span class="key">2</span></div>
-        <div class="slot"><span class="key">3</span></div>
-        <div class="slot"><span class="key">4</span></div>
-        <div class="slot"><span class="key">5</span></div>
-        <div class="slot"><span class="key">6</span></div>
-      </div>
+      <div id="ammoInfo" class="ammo-info" hidden><span id="ammoMag">0</span><small id="ammoReserve">0</small></div>
+      <div class="hotbar" id="hotbar"></div>
     </div>
   </div>
 

@@ -59,18 +59,46 @@ export function createCharacter(outfit = OUTFIT) {
     return shoulder;
   });
 
+  // Whatever you hold goes in the right hand. The hand's "forward" points
+  // down the arm, so a held gun points wherever the arm points.
+  // (The model faces +Z, so its right side is -X: arms[0] is the right arm.)
+  const [rightArm, leftArm] = arms;
+  const hand = new THREE.Group();
+  hand.position.set(0, -0.62, 0.02);
+  rightArm.add(hand);
+
   let phase = 0;
   return {
     root,
+    hand,
     // speed: how fast we're moving; grounded: on the floor?; crouch: 0..1
-    animate(dt, speed, grounded, crouch) {
+    // pose: 'none' | 'gun' | 'item' | 'pick'; pitch: where the camera looks (up/down);
+    // action: 0..1 for a pickaxe swing or a little kick when a gun fires
+    animate(dt, speed, grounded, crouch, pose = 'none', pitch = 0, action = 0) {
       const swing = grounded ? Math.min(1, speed / 6) : 0;
       phase += dt * (4 + speed * 1.3);
       const s = Math.sin(phase) * 0.75 * swing;
       legs[0].rotation.x = grounded ? s : 0.5;
       legs[1].rotation.x = grounded ? -s : -0.3;
-      arms[0].rotation.x = -s * 0.8;
-      arms[1].rotation.x = s * 0.8;
+      rightArm.rotation.z = leftArm.rotation.z = 0;
+      if (pose === 'gun') {
+        // Both arms point the gun where you aim; the left hand reaches across to hold it
+        rightArm.rotation.x = -Math.PI / 2 - pitch - action * 0.25;
+        leftArm.rotation.x = -Math.PI / 2 - pitch + 0.1;
+        leftArm.rotation.z = -0.9;
+      } else if (pose === 'pick') {
+        // Swing: lift the pickaxe up high, then chop down
+        const chop = action > 0 ? Math.sin(action * Math.PI) : 0;
+        rightArm.rotation.x = -0.5 - chop * 1.9 + s * 0.3;
+        leftArm.rotation.x = s * 0.8;
+      } else if (pose === 'item') {
+        rightArm.rotation.x = -1.1;
+        leftArm.rotation.x = -1.0;
+        leftArm.rotation.z = -0.6;
+      } else {
+        arms[0].rotation.x = -s * 0.8;
+        arms[1].rotation.x = s * 0.8;
+      }
       // Crouching: drop the upper body and bend the legs
       body.position.y = -0.3 * crouch;
       legs[0].scale.y = legs[1].scale.y = 1 - 0.35 * crouch;

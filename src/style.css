@@ -90,12 +90,66 @@ kbd {
 .compass-strip span.tick { opacity: .55; font-size: 11px; top: 8px; }
 .compass-needle { position: absolute; left: 50%; bottom: 0; width: 2px; height: 8px; background: var(--white); transform: translateX(-50%); }
 
-.crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+/* The crosshair's four lines sit --gap pixels from the middle; the gap grows with bullet spread. */
+.crosshair { --gap: 6px; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .crosshair i { position: absolute; background: var(--white); box-shadow: 0 0 2px rgba(0, 0, 0, .9); }
-.crosshair i:nth-child(1) { width: 2px; height: 8px; left: -1px; top: -14px; }
-.crosshair i:nth-child(2) { width: 2px; height: 8px; left: -1px; top: 6px; }
-.crosshair i:nth-child(3) { width: 8px; height: 2px; left: -14px; top: -1px; }
-.crosshair i:nth-child(4) { width: 8px; height: 2px; left: 6px; top: -1px; }
+.crosshair i:nth-child(1) { width: 2px; height: 8px; left: -1px; top: calc(-8px - var(--gap)); }
+.crosshair i:nth-child(2) { width: 2px; height: 8px; left: -1px; top: var(--gap); }
+.crosshair i:nth-child(3) { width: 8px; height: 2px; left: calc(-8px - var(--gap)); top: -1px; }
+.crosshair i:nth-child(4) { width: 8px; height: 2px; left: var(--gap); top: -1px; }
+.crosshair.dot i { display: none; }
+.crosshair.dot::after { content: ''; position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: var(--white); box-shadow: 0 0 2px #000; }
+.crosshair.hidden { display: none; }
+
+/* Hit marker: an X that flashes when you hit (yellow for headshots, red for a knockdown) */
+.hit-marker { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; opacity: 0; }
+.hit-marker::before, .hit-marker::after {
+  content: ''; position: absolute; left: 10px; top: -2px; width: 2px; height: 26px; background: var(--white);
+  box-shadow: 0 0 2px #000; transform: rotate(45deg);
+}
+.hit-marker::after { transform: rotate(-45deg); }
+.hit-marker.show { opacity: 1; }
+.hit-marker.head::before, .hit-marker.head::after { background: var(--yellow); }
+.hit-marker.kill::before, .hit-marker.kill::after { background: #ff4d4d; height: 30px; top: -4px; }
+
+/* Damage numbers float up from where you hit */
+.damage-layer { position: absolute; inset: 0; overflow: hidden; }
+.dmg {
+  position: absolute; left: 0; top: 0; font-family: var(--display); font-size: 26px; color: var(--white);
+  -webkit-text-stroke: 1px rgba(0, 0, 0, .55); text-shadow: 0 2px 0 rgba(0, 0, 0, .5); will-change: transform;
+}
+.dmg.shield { color: #6cc8ff; }
+.dmg.head { color: var(--yellow); font-size: 32px; }
+
+/* Sniper scope: black all around a round window */
+.scope { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 0, transparent 34vh, #000 34.3vh); }
+.scope i { position: absolute; background: rgba(0, 0, 0, .85); }
+.scope i:nth-child(1) { left: 50%; top: 16vh; bottom: 16vh; width: 2px; margin-left: -1px; }
+.scope i:nth-child(2) { top: 50%; left: calc(50% - 34vh); right: calc(50% - 34vh); height: 2px; margin-top: -1px; }
+
+/* A red glow around the edges after taking damage */
+.hurt { position: absolute; inset: 0; opacity: 0; box-shadow: inset 0 0 120px 30px rgba(255, 30, 30, .8); }
+
+/* "Pick up ..." prompt (bottom middle), with a fill bar for hold-to-open */
+.prompt {
+  position: absolute; left: 50%; top: 62%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px 10px; background: rgba(11, 27, 77, .75); border-radius: 6px; font: 700 17px var(--text);
+  text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden;
+}
+.prompt.no-key kbd { display: none; }
+.prompt-fill { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: var(--yellow); }
+
+/* "Reloading 1.2s" / "Bandages 2.0s" bar under the crosshair */
+.progress { position: absolute; left: 50%; top: 56%; width: 220px; transform: translateX(-50%); }
+.progress-label { display: flex; justify-content: space-between; font: 700 13px var(--text); letter-spacing: .06em; text-transform: uppercase; text-shadow: 0 1px 2px #000; margin-bottom: 4px; }
+.progress-track { height: 6px; background: rgba(0, 0, 0, .5); border-radius: 3px; overflow: hidden; }
+.progress-track div { height: 100%; width: 0; background: var(--white); }
+
+/* Short messages ("Health is full") */
+.toast {
+  position: absolute; left: 50%; top: 30%; transform: translateX(-50%); padding: 8px 18px; border-radius: 6px;
+  background: rgba(11, 27, 77, .75); font: 700 16px var(--text); text-shadow: 0 1px 2px #000;
+}
 
 .vitals { position: absolute; left: 28px; bottom: 28px; display: flex; flex-direction: column; gap: 6px; width: min(320px, 40vw); }
 .bar { display: flex; align-items: center; gap: 10px; transform: skew(-12deg); }
@@ -120,3 +174,33 @@ kbd {
 .slot .key { position: absolute; top: 3px; left: 6px; font: 700 12px var(--text); opacity: .8; }
 .slot .label { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font: 700 10px var(--text); letter-spacing: .06em; text-transform: uppercase; }
 .slot.pick::after { content: ''; position: absolute; left: 50%; top: 46%; width: 28px; height: 6px; background: #c9ced8; border-radius: 3px; transform: translate(-50%, -50%) rotate(-35deg); box-shadow: 9px 9px 0 -1px #8a5a32; }
+/* A slot holding an item is tinted in its rarity color (--r) */
+.slot.item { background: linear-gradient(160deg, var(--r) -20%, rgba(11, 27, 77, .85) 85%); border-color: var(--r); }
+.slot.item.selected { border-color: var(--white); background: linear-gradient(160deg, var(--r) 0%, rgba(29, 79, 216, .7) 100%); }
+.slot .name { position: absolute; top: 22px; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: 15px; text-shadow: 0 2px 0 rgba(0, 0, 0, .4); }
+.slot .name.long { font-size: 11.5px; top: 25px; }
+.slot .count { position: absolute; bottom: 3px; right: 6px; font-family: var(--display); font-size: 14px; text-shadow: 0 1px 0 #000; }
+.slot .swatch { position: absolute; top: 5px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
+
+.ammo-info { font-family: var(--display); font-size: 40px; line-height: 1; text-shadow: 0 3px 0 rgba(0, 0, 0, .4); }
+.ammo-info small { font-size: 22px; opacity: .8; margin-left: 8px; }
+.ammo-info small::before { content: '/ '; }
+.ammo-info.low span { color: #ff6a5a; }
+
+/* Backpack (hold Tab) */
+.backpack {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, 90vw);
+  background: rgba(11, 27, 77, .92); border-left: 4px solid var(--yellow); border-radius: 4px; padding: 18px 24px;
+}
+.backpack h3, .backpack h4 { margin: 0 0 10px; font-family: var(--display); font-weight: 400; letter-spacing: .04em; }
+.backpack h3 { font-size: 28px; } .backpack h4 { font-size: 18px; margin-top: 16px; }
+.backpack-slots { display: grid; gap: 6px; }
+.backpack-slots div { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: 4px; background: rgba(255, 255, 255, .06); border-left: 4px solid var(--r, transparent); font-weight: 700; }
+.backpack-slots div.selected { background: rgba(255, 255, 255, .16); }
+.backpack-ammo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.backpack-ammo div { padding: 8px; border-radius: 4px; background: rgba(255, 255, 255, .06); text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.backpack-ammo b { display: block; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--c); }
+.backpack .hint { margin: 14px 0 0; }
+
+.controls-card dl.two-col { grid-template-columns: auto auto auto auto; }
+.controls-card small { opacity: .7; }

@@ -16,6 +16,13 @@ import { buildWorld } from './world/world.js';
 import { Player } from './player/player.js';
 import { ThirdPersonCamera } from './player/camera.js';
 import { buildCompass, updateHud } from './ui/hud.js';
+import { Feedback } from './ui/feedback.js';
+import { Loot } from './loot/loot.js';
+import { makeWeapon, makeAmmo, makeHeal } from './loot/items.js';
+import { Targets, placeTargets } from './weapons/targets.js';
+import { Effects } from './weapons/effects.js';
+import { Weapons } from './weapons/weapons.js';
+import { initAudio, toggleMute } from './audio/sound.js';
 
 const $ = (id) => document.getElementById(id);
 let state = 'loading';
@@ -43,10 +50,16 @@ async function boot() {
   // ---------- Physics world and the island ----------
   const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const world = buildWorld(scene, physics);
+  const targets = new Targets(scene, physics);
+  const start = placeTargets(targets, world);   // practice range + where you start
+  const loot = new Loot(scene, physics, world);
   physics.step(); // register everything so the first collision checks work
 
   const player = new Player(scene, physics, world);
   const cam = new ThirdPersonCamera(camera, physics, world);
+  const effects = new Effects(scene);
+  const feedback = new Feedback();
+  const weapons = new Weapons({ physics, player, cam, targets, loot, effects, feedback });
   initInput(renderer.domElement);
   buildCompass();
 
@@ -60,9 +73,17 @@ async function boot() {
     $('pauseHint').textContent = '';
   }
 
-  $('playBtn').addEventListener('click', () => {
+  // A new match: fresh loot, empty hands, standing at the practice range.
+  function newMatch() {
     player.respawn();
-    cam.yaw = 0; cam.pitch = -0.1;
+    player.inventory.reset();
+    loot.reset(start);
+    cam.yaw = start.yaw; cam.pitch = -0.1;
+  }
+
+  $('playBtn').addEventListener('click', () => {
+    initAudio(); // sound is only allowed after a click
+    newMatch();
     show('playing');
     lockPointer(); // hide the cursor so the mouse can turn the camera
   });
@@ -91,8 +112,20 @@ async function boot() {
       physics.timestep = dt;
       physics.step();
       cam.update(dt, player);
+      weapons.update(dt, input, camera);   // shoot after the camera moved, so bullets go where you see
+      const prompt = loot.interact(dt, input, player, cam.forward);
+      loot.update(dt, now / 1000, player);
+      targets.update(dt, camera);
+      effects.update(dt);
+      feedback.update(dt, camera);
       world.sky.update(dt, player.feet);
-      updateHud(dt, player, cam);
+      if (input.pressed.has('KeyM')) weapons.say(toggleMute() ? 'Sound off (M)' : 'Sound on (M)');
+      if (player.health <= 0) {
+        // No real matches yet (Build 5): just start again at the range, keeping your loot.
+        player.respawn();
+        weapons.say('You were eliminated! Back to the start.');
+      }
+      updateHud(dt, player, cam, weapons.hudInfo(), prompt, input);
     } else if (state === 'menu') {
       cam.orbit(now / 1000);
       world.sky.update(dt, new THREE.Vector3(0, 0, 0));
@@ -110,9 +143,49 @@ async function boot() {
   window.__game = {
     ready: true,
     state: () => state,
-    player: () => ({ x: player.position.x, y: player.position.y, z: player.position.z, grounded: player.grounded }),
+    player: () => ({ x: player.position.x, y: player.position.y, z: player.position.z, grounded: player.grounded, health: player.health, shield: player.shield }),
     groundAt: (x, z) => world.heightAt(x, z),
     renderInfo: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
+    // How many visible meshes are in the scene, grouped by what they belong to (for performance checks)
+    meshCount: () => {
+      const counts = {};
+      scene.traverseVisible((o) => {
+        if (!o.isMesh) return;
+        let top = o; while (top.parent && top.parent !== scene) top = top.parent;
+        const key = top.isMesh ? top.geometry.type : top.type + top.children.length;
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return counts;
+    },
+    inventory: () => JSON.parse(JSON.stringify({ slots: player.inventory.slots, ammo: player.inventory.ammo, selected: player.inventory.selected })),
+    targets: () => targets.list.map((t) => ({ health: t.health, shield: t.shield, down: t.down > 0 })),
+    lootCount: () => ({ floor: loot.items.length, chests: loot.chests.length, opened: loot.chests.filter((c) => c.opened).length }),
+    give: (type, rarity = 2) => {
+      player.inventory.add(makeWeapon(type, rarity));
+      player.inventory.add(makeAmmo(SETTINGS.weapons[type].ammo, 60));
+    },
+    giveHeal: (type, count) => player.inventory.add(makeHeal(type, count)),
+    hurt: (amount) => player.takeDamage(amount),
+    respawn: () => { player.respawn(); cam.yaw = start.yaw; },
+    // Point the camera at a practice target (the camera looks along a line through the shoulder point)
+    aimAt: (i) => {
+      const t = targets.list[i].position;
+      for (let k = 0; k < 3; k++) {
+        const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
+        const pivot = player.feet.add(new THREE.Vector3(0, SETTINGS.camera.height, 0)).addScaledVector(right, SETTINGS.camera.shoulder);
+        const d = t.clone().sub(pivot);
+        cam.yaw = Math.atan2(-d.x, -d.z);
+        cam.pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+      }
+    },
+    // Move next to the nearest closed chest (for testing)
+    goToChest: () => {
+      const c = loot.chests.find((ch) => !ch.opened);
+      const x = c.pos.x + Math.sin(c.rotY) * 1.6, z = c.pos.z + Math.cos(c.rotY) * 1.6;
+      player.body.setTranslation({ x, y: c.pos.y + 1.0, z }, true);
+      player.position.set(x, c.pos.y + 1.0, z);
+      cam.yaw = Math.atan2(x - c.pos.x, z - c.pos.z); // face the chest
+    },
   };
 }
 

@@ -8,6 +8,7 @@ export const input = {
   keys: new Set(),        // keys held down right now (e.g. 'KeyW')
   pressed: new Set(),     // keys pressed down during this frame only
   buttons: new Set(),     // mouse buttons held (0 = left, 2 = right)
+  clicked: new Set(),     // mouse buttons pressed down during this frame only
   mouseDX: 0,             // mouse movement since last frame
   mouseDY: 0,
   wheel: 0,               // scroll wheel since last frame (+1 / -1)
@@ -31,10 +32,12 @@ export function initInput(canvas) {
 
   window.addEventListener('mousemove', (e) => {
     if (!isLocked()) return;
+    // Some browsers send one huge jump right after locking the mouse; ignore it.
+    if (Math.abs(e.movementX) > 300 || Math.abs(e.movementY) > 300) return;
     input.mouseDX += e.movementX;
     input.mouseDY += e.movementY;
   });
-  canvas.addEventListener('mousedown', (e) => input.buttons.add(e.button));
+  canvas.addEventListener('mousedown', (e) => { input.buttons.add(e.button); input.clicked.add(e.button); });
   window.addEventListener('mouseup', (e) => input.buttons.delete(e.button));
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('wheel', (e) => { input.wheel += Math.sign(e.deltaY); }, { passive: true });
@@ -43,6 +46,7 @@ export function initInput(canvas) {
 // Call once at the end of every frame.
 export function endInputFrame() {
   input.pressed.clear();
+  input.clicked.clear();
   input.mouseDX = 0;
   input.mouseDY = 0;
   input.wheel = 0;

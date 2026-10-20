@@ -9,6 +9,9 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { SETTINGS } from '../settings.js';
 import { createCharacter } from './character.js';
+import { Inventory } from './inventory.js';
+import { applyDamage } from '../loot/items.js';
+import { sound } from '../audio/sound.js';
 
 const P = SETTINGS.player;
 const HALF = P.height / 2; // distance from the capsule's center to the feet
@@ -25,6 +28,16 @@ export class Player {
     this.health = P.maxHealth;
     this.shield = 0;
     this.materials = { wood: 0, stone: 0, metal: 0 };
+    this.inventory = new Inventory();
+    // Set every frame by the weapons code:
+    this.slowdown = 1;        // e.g. 0.6 while aiming
+    this.canSprint = true;    // no sprinting while aiming, shooting or healing
+    this.pose = 'none';       // how to hold the arms (see character.js)
+    this.action = 0;          // pickaxe swing / gun kick, 0..1
+    this.pitch = 0;           // where the camera looks up/down (for the arms)
+    this.hurtTimer = 0;       // red flash on the screen after taking damage
+    this.lastDamage = 0;
+    this.airPeak = null;      // highest point of the current fall (for fall damage)
 
     // Physics capsule: a pill shape, moved by our code ("kinematic"), not pushed around by physics.
     const s = world.spawn;
@@ -49,6 +62,17 @@ export class Player {
     this.velocity.set(0, 0, 0);
     this.health = P.maxHealth;
     this.shield = 0;
+    this.airPeak = null;
+    this.hurtTimer = 0;
+  }
+
+  // Shield takes the damage first, then health. Returns what was lost.
+  takeDamage(amount) {
+    const lost = applyDamage(this, amount);
+    sound.hurt();
+    this.hurtTimer = 0.6;
+    this.lastDamage = amount;
+    return lost;
   }
 
   // Feet position (where the model stands)
@@ -65,9 +89,11 @@ export class Player {
 
     const crouching = k.has('KeyC') && !this.swimming;
     this.crouch += ((crouching ? 1 : 0) - this.crouch) * Math.min(1, dt * 12);
-    const sprinting = k.has('ShiftLeft') && ahead > 0 && !crouching;
+    const sprinting = k.has('ShiftLeft') && ahead > 0 && !crouching && this.canSprint;
     let speed = crouching ? P.crouchSpeed : sprinting ? P.sprintSpeed : P.walkSpeed;
     if (this.swimming) speed = P.swimSpeed;
+    speed *= this.slowdown;
+    this.sprinting = sprinting;
 
     // Camera "forward" (flat on the ground) and "right"
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
@@ -106,12 +132,23 @@ export class Player {
     if (this.position.y - HALF < ground - 2) this.position.y = ground + HALF + 0.1;
     this.body.setNextKinematicTranslation(this.position);
 
+    // Fall damage: remember the highest point while in the air, check the drop on landing
+    const feetNow = this.position.y - HALF;
+    if (this.swimming) this.airPeak = null;
+    else if (!this.grounded) this.airPeak = Math.max(this.airPeak ?? feetNow, feetNow);
+    else if (this.airPeak !== null) {
+      const fall = this.airPeak - feetNow;
+      this.airPeak = null;
+      if (fall > P.safeFall) this.takeDamage(Math.round((fall - P.safeFall) * P.fallDamagePerMeter));
+    }
+    this.hurtTimer = Math.max(0, this.hurtTimer - dt);
+
     // 5. Move and animate the model: face where the camera looks
     const turn = Math.atan2(Math.sin(yaw + Math.PI - this.facing), Math.cos(yaw + Math.PI - this.facing));
     this.facing += turn * Math.min(1, dt * 14);
     this.model.root.position.copy(this.feet);
     this.model.root.rotation.y = this.facing;
     const horizontal = Math.hypot(this.velocity.x, this.velocity.z);
-    this.model.animate(dt, horizontal, this.grounded || this.swimming, this.crouch);
+    this.model.animate(dt, horizontal, this.grounded || this.swimming, this.crouch, this.pose, this.pitch, this.action);
   }
 }
