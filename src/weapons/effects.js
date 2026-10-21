@@ -26,11 +26,15 @@ export class Effects {
     }
     this.nextTracer = 0;
 
-    // Muzzle flash: a small bright star that shows for a split second.
-    this.flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), additive('#fff1b0', 1));
-    this.flash.visible = false;
-    scene.add(this.flash);
-    this.flashLife = 0;
+    // Muzzle flashes: small bright stars that show for a split second (several, for bots too).
+    const flashGeo = new THREE.OctahedronGeometry(0.12, 0), flashMat = additive('#fff1b0', 1);
+    this.flashes = Array.from({ length: 8 }, () => {
+      const mesh = new THREE.Mesh(flashGeo, flashMat);
+      mesh.visible = false;
+      scene.add(mesh);
+      return { mesh, life: 0 };
+    });
+    this.nextFlash = 0;
 
     // Sparks: many tiny cubes drawn in one go (InstancedMesh).
     this.sparkMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: '#ffffff' }), SPARKS);
@@ -59,11 +63,13 @@ export class Effects {
   }
 
   muzzleFlash(position) {
-    this.flash.position.copy(position);
-    this.flash.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
-    this.flash.scale.setScalar(0.8 + Math.random() * 0.6);
-    this.flash.visible = true;
-    this.flashLife = 0.05;
+    const f = this.flashes[this.nextFlash];
+    this.nextFlash = (this.nextFlash + 1) % this.flashes.length;
+    f.mesh.position.copy(position);
+    f.mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    f.mesh.scale.setScalar(0.8 + Math.random() * 0.6);
+    f.mesh.visible = true;
+    f.life = 0.05;
   }
 
   // A burst of sparks. color: '#ffd27a' for ground/walls, '#ff6040' for targets, etc.
@@ -86,9 +92,10 @@ export class Effects {
       t.mesh.material.opacity = Math.max(0, t.life / 0.07) * 0.9;
       if (t.life <= 0) t.mesh.visible = false;
     }
-    if (this.flashLife > 0) {
-      this.flashLife -= dt;
-      if (this.flashLife <= 0) this.flash.visible = false;
+    for (const f of this.flashes) {
+      if (f.life <= 0) continue;
+      f.life -= dt;
+      if (f.life <= 0) f.mesh.visible = false;
     }
     this.sparks.forEach((s, i) => {
       if (s.life <= 0) return;

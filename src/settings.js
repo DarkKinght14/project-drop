@@ -141,6 +141,37 @@ export const SETTINGS = {
     showDistance: 90,       // loot further away than this isn't drawn (faster)
   },
 
+  /* ---------- AI bots ----------
+     reaction: seconds before a bot shoots at someone it just spotted
+     aimError: how far off (degrees) its aim wobbles; it gets steadier the longer it tracks you
+     fireRate / damage: x the weapon's normal numbers; buildChance: how often it walls up when shot
+     mats: wood it starts with; headshot: chance it aims for the head; healAt: heals below this */
+  bots: {
+    count: 12,
+    counts: [5, 12, 20],          // the choices on the main menu
+    viewRange: 75,
+    hearRange: 55,                // gunshots this close make bots come and look
+    fieldOfView: 150,             // degrees a bot can see in front of it
+    noticeRange: 20,              // closer than this, bots notice you even behind them (they hear you)
+    walkSpeed: 5.2,
+    sprintSpeed: 7.4,
+    thinkInterval: 0.25,          // how often each bot re-thinks (seconds)
+    spawnMinDistance: 80,         // bots start at least this far from you
+    lootRange: 45,                // how far a bot will go for a weapon or chest
+    difficulty: {
+      easy:   { name: 'Easy',   reaction: 0.9,  aimError: 2.4, fireRate: 0.55, damage: 0.55, buildChance: 0.15, mats: 60,  headshot: 0.05, healAt: 40 },
+      normal: { name: 'Normal', reaction: 0.55, aimError: 1.3, fireRate: 0.8,  damage: 0.75, buildChance: 0.45, mats: 150, headshot: 0.12, healAt: 60 },
+      hard:   { name: 'Hard',   reaction: 0.3,  aimError: 0.7, fireRate: 1.0,  damage: 1.0,  buildChance: 0.85, mats: 300, headshot: 0.25, healAt: 75 },
+    },
+    names: ['Raven', 'Juniper', 'Moss', 'Pixel', 'Ember', 'Nova', 'Tundra', 'Quill', 'Basalt', 'Comet', 'Sable', 'Rook',
+      'Willow', 'Fable', 'Cinder', 'Marble', 'Glint', 'Harbor', 'Onyx', 'Sprout', 'Thistle', 'Vesper', 'Zephyr', 'Kestrel'],
+    // Each weapon's comfortable fighting distance: [too close, ideal, too far]
+    ranges: { shotgun: [0, 5, 14], smg: [3, 10, 25], pistol: [4, 14, 35], ar: [8, 22, 70], sniper: [25, 55, 140] },
+  },
+
+  /* ---------- Bot navigation (path finding) ---------- */
+  nav: { cell: 1, maxSearch: 9000, pathsPerFrame: 2 },
+
   /* ---------- Practice targets ---------- */
   targets: { health: 100, shield: 50, respawnTime: 4 },
 };

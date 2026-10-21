@@ -18,7 +18,7 @@ export function buildWorld(scene, physics) {
   const field = makeHeightField(SETTINGS.world.seed);
 
   const houseSpots = pickHouseSpots(field, rng);
-  buildTerrain(scene, physics, field, rng);
+  const terrain = buildTerrain(scene, physics, field, rng);
   const sky = buildSky(scene, rng);
   const houses = houseSpots.map((spot) => buildHouse(scene, physics, spot, rng));
 
@@ -35,7 +35,7 @@ export function buildWorld(scene, physics) {
   buildBushes(scene, field, rng, isFree);
   const cars = buildCars(scene, physics, field, rng, isFree, trees, rocks);
 
-  return { field, sky, houses, trees, rocks, cars, spawn, range, heightAt: field.heightAt };
+  return { field, sky, houses, trees, rocks, cars, spawn, range, heightAt: field.heightAt, terrainCollider: terrain.collider };
 }
 
 // The practice range points in the flattest direction from the spawn point.

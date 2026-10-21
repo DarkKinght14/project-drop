@@ -10,7 +10,7 @@ import { SETTINGS } from '../settings.js';
 import { makeRandom } from '../core/random.js';
 import { makeItemModel, makeChestModel, makeGlow } from './models.js';
 import { itemName, rarityColor, rollFloorLoot, rollChestLoot, makeWeapon, makeAmmo, makeHeal } from './items.js';
-import { sound } from '../audio/sound.js';
+import { sound, soundAt } from '../audio/sound.js';
 
 const L = SETTINGS.loot;
 
@@ -134,7 +134,7 @@ export class Loot {
 
   openChest(chest) {
     chest.opened = true;
-    sound.chestOpen();
+    soundAt(chest.pos, () => sound.chestOpen());
     const items = rollChestLoot(Math.random);
     const top = chest.pos.clone().setY(chest.pos.y + 0.5);
     items.forEach((item, i) => {

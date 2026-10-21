@@ -114,7 +114,10 @@ export class Targets {
   }
 
   // Look up what a bullet hit. Returns { target, head } or undefined.
-  lookup(collider) { return this.byCollider.get(collider.handle); }
+  lookup(collider) {
+    const found = this.byCollider.get(collider.handle);
+    return found && { ...found, manager: this };
+  }
 
   // Returns { shield, health, killed } so the game can show the right numbers.
   damage(target, amount) {

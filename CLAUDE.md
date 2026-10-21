@@ -28,7 +28,7 @@ npm test         # smoke test: needs a build first; drives headless Microsoft Ed
 ```
 `npm test` runs two files:
 - `tests/logic.mjs`: plain Node checks of the rules (damage, rarity, loot rolls, inventory). It imports `src/` modules directly, so anything it tests must not import three.js.
-- `tests/smoke.mjs`: starts `vite preview` and opens the game in headless Edge (`channel: 'msedge'`; there's no Playwright browser download, since `playwright-core` is used). It clicks Play, sprints and jumps, opens a chest with E, shoots a dummy and heals with bandages. It fails on any console error or a step that didn't work. It drives the game through the `window.__game` hooks in `main.js` (`give`, `aimAt`, `goToChest`, `meshCount`…).
+- `tests/smoke.mjs`: starts `vite preview` and opens the game in headless Edge (`channel: 'msedge'`; there's no Playwright browser download, since `playwright-core` is used). It clicks Play, sprints and jumps, opens a chest with E, shoots a dummy and heals with bandages. It fails on any console error or a step that didn't work. It drives the game through the `window.__game` hooks in `main.js` (`give`, `aimAt`, `goToChest`, `meshCount`, `freezeBots`, `botInFront`, `killBots`…). Bots are frozen for the early parts of the test so they can't eliminate the player mid-test.
 
 Screenshots go to `tests/output/` (gitignored). Read them to check visuals. The headless browser renders with SwiftShader at about 20 FPS, and game time runs slower than real time because `dt` is capped. So wait for conditions with `waitForFunction`, not fixed timeouts.
 
@@ -55,6 +55,18 @@ Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and publ
   - `building.js` keeps one `InstancedMesh` per piece type × material (12 draw calls total). Removing a piece swaps the last instance into its slot. Each piece has its own fixed Rapier body. `byCollider` maps hits back to pieces. Pieces grow from `startHealth` to full over the material's `buildTime`, and the instance color shows growth and damage.
   - `Building.update` runs *before* `Weapons.update` each frame. While `building.active`, weapons do nothing, and pressing 1–6 leaves build mode.
 - **Harvesting** (`src/building/harvest.js`): trees and rocks (instanced, `world/nature.js`) and cars (`world/props.js`, instanced per color) record their collider and instance `parts`. A pickaxe hit adds materials, shakes the instances, and after `maxHits` hides them (zero matrix) and disables the collider. `reset()` restores everything on a new match.
+- **Bots** (`src/bots/`):
+  - `navgrid.js` builds a 1 m walkability grid once at boot: dry land, not steep, and a Rapier `intersectionWithShape` probe (excluding `world.terrainCollider`) finds trees, rocks, cars, house walls, chests and dummies. It must run after a `physics.step()` and before the player body exists. It provides A* (`findPath`, weighted heuristic, `maxSearch` cap with a fallback to the closest cell reached) plus string-pulling smoothing. Player builds are *not* in the grid: a stuck bot shoots the piece in its way (`pieceAhead` → `breakTarget`).
+  - `bot.js` is one bot, with its own Rapier character controller (same settings as the player) and a state machine re-run every `thinkInterval`: loot / roam / listen / fight / chase / heal.
+    - Perception means range, FOV (ignored within `noticeRange`) and a line-of-sight ray.
+    - Aim error is `diff.aimError × (1 + 1.3 × (1 − aimTrack)) × (1 + targetSpeed/12)` plus a fraction of the weapon's spread. Bot damage is scaled by `diff.damage`.
+    - When shot, a bot may `building.tryBuild('wall', …)`. When its target is above it, it builds stairs.
+  - `bots.js` (manager) spawns bots, processes `pathsPerFrame` path requests, and resolves bot bullets (`hitSomething`: player, bot, build piece). It also handles eliminations (drops the bot's loot and calls `onElimination` for the kill feed) and gunshot `alert`s.
+  - Characters share a duck-typed interface: `position`, `feet`, `collider`, `alive`, `crouch`, `velocity`, `name`. Headshots are anything hit above 1.42 m from the feet.
+  - The player's weapons resolve hits via `weapons.findTarget` (dummies, then bots). `applyHit` calls `manager.damage(target, dmg, attacker, weaponName)`.
+- **Match flow** (`main.js`): Play → `newMatch()` → `bots.start(count, difficulty)`. The player dying or the last bot falling calls `endMatch(won)` → state `'over'` and the `#results` screen. Menu options (bots, difficulty) are saved in localStorage under `drop-options`.
+- **Sound** has a listener (`setListener(player.feet)`) and `soundAt(pos, fn)` for distance-scaled sounds (bot shots, builds, chests).
+- **Characters are baked** per joint (`character.js` `bakeJoint`, cached per outfit), so each character costs 5 meshes. Far bots skip shadows and are hidden beyond 230 m.
 - **Input note**: very quick clicks can begin and end between two frames, so actions check `input.buttons.has(0) || input.clicked.has(0)`.
 - **Sound** (`src/audio/sound.js`) is generated with Web Audio (no files). `initAudio()` must be called from a click (the Play button).
 - **`src/ui/`**: `hud.js` writes to the DOM in `index.html` (only when values change; the hotbar and backpack re-render from a key string). `feedback.js` projects floating damage numbers and flashes the hit marker. Screens and HUD markup live in `index.html`, and styling in `src/style.css` (CSS variables at the top: Lilita One display font, Barlow text).

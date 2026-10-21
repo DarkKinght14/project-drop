@@ -66,7 +66,7 @@ export function buildTerrain(scene, physics, field, rng) {
   // Physics: the same triangles become a solid surface you can walk on.
   const vertices = new Float32Array(pos.array);
   const indices = new Uint32Array(geometry.index.array);
-  physics.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices));
+  const collider = physics.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices));
 
   // Low-poly look: every triangle gets one flat color depending on height and slope.
   const flat = geometry.toNonIndexed();
@@ -101,5 +101,5 @@ export function buildTerrain(scene, physics, field, rng) {
   for (const [x, z, hx, hz] of [[half, 0, 1, half], [-half, 0, 1, half], [0, half, half, 1], [0, -half, half, 1]]) {
     physics.createCollider(RAPIER.ColliderDesc.cuboid(hx, 60, hz).setTranslation(x, 40, z));
   }
-  return mesh;
+  return { mesh, collider };
 }

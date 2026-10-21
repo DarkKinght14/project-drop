@@ -6,6 +6,21 @@
    ===================================================================== */
 let ctx = null, master = null, noiseBuffer = null;
 let muted = false;
+let scale = 1;                     // volume for the sound being played (quieter when far away)
+const listener = { x: 0, y: 0, z: 0 };
+
+// Where "your ears" are (the player), so far-away sounds can be quieter.
+export function setListener(pos) { listener.x = pos.x; listener.y = pos.y; listener.z = pos.z; }
+
+// Play a sound that happens at a position: full volume up close, fading out by ~150 m.
+export function soundAt(pos, play) {
+  const d = Math.hypot(pos.x - listener.x, pos.y - listener.y, pos.z - listener.z);
+  const v = 1 / (1 + d / 12);
+  if (v < 0.04) return;
+  scale = v;
+  play();
+  scale = 1;
+}
 
 // Browsers only allow sound after a click, so the Play button calls this.
 export function initAudio() {
@@ -37,7 +52,7 @@ function noise({ freq = 1000, q = 1, time = 0.1, volume = 0.5, type = 'lowpass',
   const filter = ctx.createBiquadFilter();
   filter.type = type; filter.frequency.value = freq; filter.Q.value = q;
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume, t);
+  gain.gain.setValueAtTime(volume * scale, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + time);
   src.connect(filter).connect(gain).connect(master);
   src.start(t, Math.random() * 0.5);
@@ -53,7 +68,7 @@ function tone({ from = 440, to = from, time = 0.1, volume = 0.2, wave = 'sine', 
   osc.frequency.setValueAtTime(from, t);
   osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), t + time);
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume, t);
+  gain.gain.setValueAtTime(volume * scale, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + time);
   osc.connect(gain).connect(master);
   osc.start(t);

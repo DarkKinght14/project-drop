@@ -38,6 +38,11 @@ export class Player {
     this.hurtTimer = 0;       // red flash on the screen after taking damage
     this.lastDamage = 0;
     this.airPeak = null;      // highest point of the current fall (for fall damage)
+    this.name = 'You';
+    this.isPlayer = true;
+    this.lastAttacker = null; // who hit you last ({ name, weapon }), for the "eliminated by" screen
+    this.hitFrom = null;      // where the last hit came from (for the red direction marker)
+    this.hitTimer = 0;
 
     // Physics capsule: a pill shape, moved by our code ("kinematic"), not pushed around by physics.
     const s = world.spawn;
@@ -64,14 +69,24 @@ export class Player {
     this.shield = 0;
     this.airPeak = null;
     this.hurtTimer = 0;
+    this.lastAttacker = null;
+    this.hitTimer = 0;
   }
 
+  get alive() { return this.health > 0; }
+
   // Shield takes the damage first, then health. Returns what was lost.
-  takeDamage(amount) {
+  // attacker: the bot that shot you (if any), so the game can say who it was.
+  takeDamage(amount, attacker = null, weapon = '') {
     const lost = applyDamage(this, amount);
     sound.hurt();
     this.hurtTimer = 0.6;
     this.lastDamage = amount;
+    if (attacker) {
+      this.lastAttacker = { name: attacker.name, weapon, bot: attacker };
+      this.hitFrom = attacker.position.clone();
+      this.hitTimer = 1.2;
+    }
     return lost;
   }
 
@@ -142,6 +157,7 @@ export class Player {
       if (fall > P.safeFall) this.takeDamage(Math.round((fall - P.safeFall) * P.fallDamagePerMeter));
     }
     this.hurtTimer = Math.max(0, this.hurtTimer - dt);
+    this.hitTimer = Math.max(0, this.hitTimer - dt);
 
     // 5. Move and animate the model: face where the camera looks
     const turn = Math.atan2(Math.sin(yaw + Math.PI - this.facing), Math.cos(yaw + Math.PI - this.facing));

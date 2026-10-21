@@ -233,5 +233,53 @@ kbd {
 .dmg.metal { color: #9fc1e6; font-size: 22px; }
 .dmg.wood::before, .dmg.stone::before, .dmg.metal::before { content: '+'; }
 
+/* Match options on the main menu */
+.menu-right { display: flex; flex-direction: column; align-items: flex-end; gap: 18px; }
+.match-card { background: rgba(11, 27, 77, .75); border-left: 4px solid var(--yellow); padding: 14px 20px; border-radius: 4px; display: grid; gap: 10px; }
+.match-card h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: .04em; }
+.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.opt-row > span { font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; opacity: .75; }
+.opts { display: flex; gap: 6px; }
+.opts button {
+  font: 700 14px var(--text); color: var(--white); background: rgba(255, 255, 255, .1); cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, .25); border-radius: 5px; padding: 6px 12px; min-width: 44px;
+}
+.opts button.on { background: var(--yellow); color: var(--ink); border-color: var(--yellow); }
+.opts button:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+
+/* Players left + eliminations (top right) */
+.match-info { position: absolute; top: 12px; right: 16px; display: flex; gap: 8px; }
+.match-info div { display: flex; flex-direction: column; align-items: center; min-width: 58px; padding: 4px 10px; background: rgba(11, 27, 77, .6); border-radius: 5px; }
+.match-info b { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1; }
+.match-info span { font: 700 10px var(--text); letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+.match-info .elims b { color: var(--yellow); }
+
+/* Kill feed: who eliminated whom */
+.kill-feed { position: absolute; top: 74px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.kill-feed div { padding: 4px 10px; background: rgba(11, 27, 77, .6); border-radius: 4px; font: 600 14px var(--text); text-shadow: 0 1px 2px #000; transition: opacity .5s; }
+.kill-feed div.mine { background: rgba(255, 210, 63, .25); border-left: 3px solid var(--yellow); }
+.kill-feed div.me { background: rgba(255, 60, 60, .3); border-left: 3px solid #ff4d4d; }
+.kill-feed b { color: var(--yellow); }
+.kill-feed i { font-style: normal; opacity: .75; }
+
+/* Red marker around the crosshair pointing to where you were shot from */
+.hit-dir { position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; margin: -110px 0 0 -110px; opacity: 0; pointer-events: none; }
+.hit-dir::before {
+  content: ''; position: absolute; left: 50%; top: 0; width: 90px; height: 26px; transform: translateX(-50%);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0; border-top: 6px solid rgba(255, 50, 50, .9); filter: drop-shadow(0 0 4px rgba(255, 0, 0, .8));
+}
+
+/* Results screen */
+.results { display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, rgba(29, 79, 216, .55), rgba(11, 27, 77, .92)); }
+.results-card { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 20px; }
+.result-title { font-family: var(--display); font-size: clamp(54px, 9vw, 110px); line-height: .95; transform: skew(-8deg); text-shadow: 0 6px 0 rgba(0, 0, 0, .3); }
+.result-title.win { color: var(--yellow); }
+.result-sub { font: 600 20px var(--text); opacity: .9; min-height: 1.2em; }
+.result-stats { display: flex; gap: 12px; margin: 10px 0; }
+.result-stats div { display: flex; flex-direction: column; min-width: 120px; padding: 12px 18px; background: rgba(11, 27, 77, .7); border-radius: 6px; border-bottom: 3px solid var(--yellow); }
+.result-stats b { font-family: var(--display); font-weight: 400; font-size: 40px; }
+.result-stats span { font: 700 12px var(--text); letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+.result-buttons { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
 .controls-card dl.two-col { grid-template-columns: auto auto auto auto; }
 .controls-card small { opacity: .7; }

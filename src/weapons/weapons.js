@@ -20,8 +20,8 @@ const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Weapons {
-  constructor({ physics, player, cam, targets, loot, effects, feedback, building, harvest }) {
-    Object.assign(this, { physics, player, cam, targets, loot, effects, feedback, building, harvest });
+  constructor({ physics, player, cam, targets, bots, loot, effects, feedback, building, harvest }) {
+    Object.assign(this, { physics, player, cam, targets, bots, loot, effects, feedback, building, harvest });
     this.ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
     this.heldItem = undefined;  // what the hand model currently shows
     this.handModel = null;
@@ -202,7 +202,7 @@ export class Weapons {
     this.player.model.root.updateMatrixWorld(true);
     if (this.muzzle) this.muzzle.getWorldPosition(muzzle); else muzzle.copy(origin);
 
-    const hits = new Map(); // target -> { damage, head, point }
+    const hits = new Map(); // target -> { damage, head, point, manager }
     const builds = new Map(); // build piece -> { damage, point }
     for (let p = 0; p < stats.pellets; p++) {
       this.spreadDirection(dir, spread, shot);
@@ -212,9 +212,9 @@ export class Weapons {
       end.copy(origin).addScaledVector(shot, hit ? hit.timeOfImpact : stats.range);
       if (p < 6) this.effects.tracer(muzzle, end, stats.pellets > 1 ? 0.015 : 0.025);
       if (!hit) continue;
-      const found = this.targets.lookup(hit.collider);
+      const found = this.findTarget(hit.collider, end);
       if (found && found.target.down <= 0) {
-        const entry = hits.get(found.target) || { damage: 0, head: false, point: end.clone() };
+        const entry = hits.get(found.target) || { damage: 0, head: false, point: end.clone(), manager: found.manager };
         entry.damage += shotDamage(stats, hit.timeOfImpact, found.head);
         entry.head ||= found.head;
         hits.set(found.target, entry);
@@ -230,7 +230,7 @@ export class Weapons {
       this.effects.impact(end, '#ffd27a', 5);
     }
 
-    for (const [target, h] of hits) this.applyHit(target, h.damage, h.head, h.point);
+    for (const [target, h] of hits) this.applyHit(target, h.damage, h.head, h.point, h.manager, stats.name);
     for (const [piece, h] of builds) this.hitPiece(piece, h.damage, h.point);
 
     item.mag -= 1;
@@ -242,10 +242,16 @@ export class Weapons {
     this.recoilDebt += recoil * 0.7; // most (not all) of the kick settles back by itself
     this.effects.muzzleFlash(muzzle);
     sound.shot(item.type);
+    this.bots.alert(this.player.feet, this.player); // bots nearby hear the shot
   }
 
-  applyHit(target, damage, head, point) {
-    const result = this.targets.damage(target, damage);
+  // A practice dummy or a bot: "manager" is whoever looks after it (targets or bots).
+  findTarget(collider, point) {
+    return this.targets.lookup(collider) || this.bots.lookup(collider, point);
+  }
+
+  applyHit(target, damage, head, point, manager, weaponName = 'Pickaxe') {
+    const result = manager.damage(target, damage, this.player, weaponName);
     const total = result.shield + result.health;
     if (total <= 0) return;
     this.feedback.number(point, total, head ? 'head' : result.health > 0 ? 'health' : 'shield');
@@ -291,10 +297,10 @@ export class Weapons {
         const hit = this.physics.castRay(this.ray, PX.range, true, undefined, undefined, this.player.collider);
         if (hit) {
           end.copy(origin).addScaledVector(dir, hit.timeOfImpact);
-          const found = this.targets.lookup(hit.collider);
+          const found = this.findTarget(hit.collider, end);
           const piece = this.building.lookup(hit.collider);
           const resource = this.harvest.lookup(hit.collider);
-          if (found && found.target.down <= 0) this.applyHit(found.target, PX.damage, false, end.clone());
+          if (found && found.target.down <= 0) this.applyHit(found.target, PX.damage, found.head, end.clone(), found.manager);
           else if (piece) { this.hitPiece(piece, PX.buildDamage, end.clone()); sound.hit(); }
           else if (resource) {
             // Harvest: materials go straight into your pockets

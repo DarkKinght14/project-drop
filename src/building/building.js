@@ -19,7 +19,7 @@ import { SETTINGS } from '../settings.js';
 import { PIECES, DIRS, pickSlot, offsetFor, cellOf, tileSlot } from './grid.js';
 import { pieceGeometry, pieceColliderShape } from './pieces.js';
 import { bakedMaterial } from '../core/bake.js';
-import { sound } from '../audio/sound.js';
+import { sound, soundAt } from '../audio/sound.js';
 
 const B = SETTINGS.building;
 const MATS = Object.keys(B.materials);
@@ -93,19 +93,7 @@ export class Building {
     if (input.pressed.has('KeyR')) { this.material = MATS[(MATS.indexOf(this.material) + 1) % MATS.length]; sound.equip(); }
 
     // Where would the piece go, and is it allowed?
-    let slot = pickSlot(this.piece, player.feet, cam.yaw, cam.pitch, this.gridOffset(player.feet), SETTINGS.camera.shoulder);
-    const { cx, cz } = cellOf(slot.x, slot.z);
-    // Running up stairs: the next stairs (or floor) in front go one level higher, so they connect
-    const stairs = this.stairsUnder(player.feet);
-    if (stairs && (slot.type === 'ramp' || slot.type === 'floor')) {
-      const s = cellOf(stairs.x, stairs.z);
-      const d = DIRS[stairs.dir];
-      if (cx === s.cx + d.x && cz === s.cz + d.z) slot = tileSlot(slot.type, cx, cz, stairs.level + 1, slot.dir, stairs.offset);
-    }
-    // Going uphill, a floor ahead could end up underground: lift it one level instead
-    if (slot.type === 'floor' && slot.y + 0.12 < this.world.heightAt(slot.x, slot.z) - 0.2) {
-      slot = tileSlot('floor', cx, cz, slot.level + 1, slot.dir, slot.offset);
-    }
+    const slot = this.slotFor(this.piece, player, cam.yaw, cam.pitch, SETTINGS.camera.shoulder);
     this.target = slot;
     this.reason = this.whyNot(slot, player);
     // (no preview when a piece is already there: it would just cover it)
@@ -123,6 +111,32 @@ export class Building {
     } else if (input.clicked.has(0) && this.reason === 'materials') {
       sound.empty();
     }
+  }
+
+  // Where a piece would go for someone (the player or a bot) looking along yaw / pitch.
+  slotFor(type, who, yaw, pitch, shoulder = 0) {
+    let slot = pickSlot(type, who.feet, yaw, pitch, this.gridOffset(who.feet), shoulder);
+    const { cx, cz } = cellOf(slot.x, slot.z);
+    // Running up stairs: the next stairs (or floor) in front go one level higher, so they connect
+    const stairs = this.stairsUnder(who.feet);
+    if (stairs && (slot.type === 'ramp' || slot.type === 'floor')) {
+      const s = cellOf(stairs.x, stairs.z);
+      const d = DIRS[stairs.dir];
+      if (cx === s.cx + d.x && cz === s.cz + d.z) slot = tileSlot(slot.type, cx, cz, stairs.level + 1, slot.dir, stairs.offset);
+    }
+    // Going uphill, a floor ahead could end up underground: lift it one level instead
+    if (slot.type === 'floor' && slot.y + 0.12 < this.world.heightAt(slot.x, slot.z) - 0.2) {
+      slot = tileSlot('floor', cx, cz, slot.level + 1, slot.dir, slot.offset);
+    }
+    return slot;
+  }
+
+  // For bots: build a piece facing "yaw" if allowed. Returns true if it was built.
+  tryBuild(type, who, yaw, mat) {
+    const slot = this.slotFor(type, who, yaw, 0);
+    if (this.whyNot(slot, who, mat)) return false;
+    this.place(slot, mat, who);
+    return true;
   }
 
   // The stairs you're standing on, if any.
@@ -152,9 +166,9 @@ export class Building {
   }
 
   // Returns null if the piece can be built here, otherwise a short reason.
-  whyNot(slot, player) {
+  whyNot(slot, player, mat = this.material) {
     if (this.slots.has(slot.key)) return 'taken';
-    if (player.materials[this.material] < B.cost) return 'materials';
+    if (player.materials[mat] < B.cost) return 'materials';
     const top = slot.type === 'floor' ? slot.y + 0.12 : slot.type === 'roof' ? slot.y + 1.6 : slot.base + B.height;
     if (top < this.world.heightAt(slot.x, slot.z) - 0.2) return 'buried';
     if (this.overlapsPlayer(slot, player)) return 'blocked';
@@ -217,7 +231,7 @@ export class Building {
     this.paint(piece);
     this.slots.set(slot.key, piece);
     this.byCollider.set(collider.handle, piece);
-    sound.build(mat);
+    soundAt(slot, () => sound.build(mat));
   }
 
   // Color shows the state: blue-ish while building, darker when damaged.
@@ -264,7 +278,7 @@ export class Building {
     this.physics.removeRigidBody(piece.body);
     if (!quiet) {
       this.effects.impact(piece.center, B.materials[piece.mat].color, 24);
-      sound.breakPiece(piece.mat);
+      soundAt(piece.center, () => sound.breakPiece(piece.mat));
     }
   }
 

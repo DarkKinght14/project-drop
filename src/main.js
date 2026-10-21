@@ -1,7 +1,8 @@
 /* =====================================================================
    MAIN
    Starts the game and runs the game loop. The game is always in one of
-   these states: 'loading' -> 'menu' -> 'playing' <-> 'paused'.
+   these states: 'loading' -> 'menu' -> 'playing' <-> 'paused' -> 'over'
+   ('over' = the results screen after you win or get eliminated).
    ===================================================================== */
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -15,7 +16,7 @@ import { input, initInput, endInputFrame, isLocked, lockPointer } from './core/i
 import { buildWorld } from './world/world.js';
 import { Player } from './player/player.js';
 import { ThirdPersonCamera } from './player/camera.js';
-import { buildCompass, updateHud } from './ui/hud.js';
+import { buildCompass, updateHud, addKill, clearKillFeed } from './ui/hud.js';
 import { Feedback } from './ui/feedback.js';
 import { Loot } from './loot/loot.js';
 import { makeWeapon, makeAmmo, makeHeal } from './loot/items.js';
@@ -24,10 +25,17 @@ import { Effects } from './weapons/effects.js';
 import { Weapons } from './weapons/weapons.js';
 import { Harvest } from './building/harvest.js';
 import { Building } from './building/building.js';
-import { initAudio, toggleMute } from './audio/sound.js';
+import { initAudio, toggleMute, setListener } from './audio/sound.js';
+import { Bots } from './bots/bots.js';
+import { makeRandom } from './core/random.js';
 
 const $ = (id) => document.getElementById(id);
 let state = 'loading';
+
+// Match options from the main menu, remembered in this browser (if storage works).
+const options = { bots: SETTINGS.bots.count, difficulty: 'normal' };
+try { Object.assign(options, JSON.parse(localStorage.getItem('drop-options') || '{}')); } catch (e) { /* storage unavailable */ }
+const saveOptions = () => { try { localStorage.setItem('drop-options', JSON.stringify(options)); } catch (e) { /* ignore */ } };
 
 async function boot() {
   // The physics engine is written in another language (Rust → WebAssembly) and needs a moment to start.
@@ -63,7 +71,9 @@ async function boot() {
   const feedback = new Feedback();
   const harvest = new Harvest(world);
   const building = new Building(scene, physics, world, effects);
-  const weapons = new Weapons({ physics, player, cam, targets, loot, effects, feedback, building, harvest });
+  // Bots (this also maps the island for them: it can take a moment)
+  const bots = new Bots({ scene, physics, world, building, loot, effects, player, onElimination });
+  const weapons = new Weapons({ physics, player, cam, targets, bots, loot, effects, feedback, building, harvest });
   initInput(renderer.domElement);
   buildCompass();
 
@@ -74,6 +84,7 @@ async function boot() {
     $('mainMenu').hidden = state !== 'menu';
     $('pauseMenu').hidden = state !== 'paused';
     $('hud').hidden = state !== 'playing' && state !== 'paused';
+    $('results').hidden = state !== 'over';
     $('pauseHint').textContent = '';
   }
 
@@ -86,20 +97,65 @@ async function boot() {
     harvest.reset();
     building.reset();
     cam.yaw = start.yaw; cam.pitch = -0.1;
+    bots.start(options.bots, options.difficulty, makeRandom(Date.now() >>> 0), start);
+    clearKillFeed();
+    match.time = 0;
+    match.victory = 0;
   }
 
-  $('playBtn').addEventListener('click', () => {
+  // ---------- The match: eliminations, winning and losing ----------
+  const match = { time: 0, victory: 0 };
+  function onElimination({ killer, victim, weapon }) {
+    if (killer === player) {
+      addKill(`<b>You</b> eliminated ${victim.name} <i>(${weapon})</i>`, 'mine');
+      weapons.say(`You eliminated ${victim.name}!`);
+    } else {
+      addKill(`${killer ? killer.name : 'The island'} eliminated ${victim.name} <i>(${weapon})</i>`);
+    }
+  }
+
+  function endMatch(won) {
+    state = 'over'; // set first, so losing the mouse doesn't count as pausing
+    document.exitPointerLock?.();
+    const by = player.lastAttacker;
+    $('resultTitle').textContent = won ? '#1 VICTORY' : 'ELIMINATED';
+    $('resultTitle').classList.toggle('win', won);
+    $('resultSub').textContent = won ? 'Last one standing. Well played!'
+      : by ? `by ${by.name} with ${by.weapon}` : 'You fell too far';
+    $('resultPlace').textContent = '#' + (won ? 1 : bots.aliveCount + 1);
+    $('resultElims').textContent = String(bots.playerElims);
+    const t = Math.floor(match.time);
+    $('resultTime').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    if (!won && by) addKill(`${by.name} eliminated <b>You</b> <i>(${by.weapon})</i>`, 'me');
+    show('over');
+  }
+
+  // Main menu: number of bots and difficulty
+  function renderOptions() {
+    $('optBots').innerHTML = SETTINGS.bots.counts.map((n) => `<button data-v="${n}" class="${n === options.bots ? 'on' : ''}">${n}</button>`).join('');
+    $('optDiff').innerHTML = Object.entries(SETTINGS.bots.difficulty)
+      .map(([k, d]) => `<button data-v="${k}" class="${k === options.difficulty ? 'on' : ''}">${d.name}</button>`).join('');
+  }
+  $('optBots').addEventListener('click', (e) => { if (e.target.dataset.v) { options.bots = Number(e.target.dataset.v); saveOptions(); renderOptions(); } });
+  $('optDiff').addEventListener('click', (e) => { if (e.target.dataset.v) { options.difficulty = e.target.dataset.v; saveOptions(); renderOptions(); } });
+  renderOptions();
+
+  function startPlaying() {
     initAudio(); // sound is only allowed after a click
     newMatch();
     show('playing');
     lockPointer(); // hide the cursor so the mouse can turn the camera
-  });
+  }
+  $('againBtn').addEventListener('click', startPlaying);
+  $('resultMenuBtn').addEventListener('click', () => { bots.clear(); show('menu'); });
+
+  $('playBtn').addEventListener('click', startPlaying);
   $('resumeBtn').addEventListener('click', async () => {
     // Browsers make you wait about a second after pressing Esc before locking the mouse again.
     if (await lockPointer()) show('playing');
     else $('pauseHint').textContent = 'Click Resume again in a moment.';
   });
-  $('menuBtn').addEventListener('click', () => show('menu'));
+  $('menuBtn').addEventListener('click', () => { bots.clear(); show('menu'); });
   // Pressing Esc releases the mouse; that's our signal to pause.
   document.addEventListener('pointerlockchange', () => {
     if (!isLocked() && state === 'playing') show('paused');
@@ -121,6 +177,9 @@ async function boot() {
       cam.update(dt, player);
       building.update(dt, input, player, cam); // before weapons: pressing 1-6 leaves build mode first
       weapons.update(dt, input, camera);   // shoot after the camera moved, so bullets go where you see
+      setListener(player.feet);
+      bots.update(dt, camera.position);
+      match.time += dt;
       harvest.update(dt);
       const prompt = loot.interact(dt, input, player, cam.forward);
       loot.update(dt, now / 1000, player);
@@ -129,12 +188,9 @@ async function boot() {
       feedback.update(dt, camera);
       world.sky.update(dt, player.feet);
       if (input.pressed.has('KeyM')) weapons.say(toggleMute() ? 'Sound off (M)' : 'Sound on (M)');
-      if (player.health <= 0) {
-        // No real matches yet (Build 5): just start again at the range, keeping your loot.
-        player.respawn();
-        weapons.say('You were eliminated! Back to the start.');
-      }
-      updateHud(dt, player, cam, weapons.hudInfo(), prompt, input, building.hudInfo());
+      updateHud(dt, player, cam, weapons.hudInfo(), prompt, input, building.hudInfo(), { alive: bots.aliveCount + 1, elims: bots.playerElims });
+      if (!player.alive) endMatch(false);
+      else if (bots.list.length && bots.aliveCount === 0 && (match.victory += dt) > 1.5) endMatch(true);
     } else if (state === 'menu') {
       cam.orbit(now / 1000);
       world.sky.update(dt, new THREE.Vector3(0, 0, 0));
@@ -193,6 +249,20 @@ async function boot() {
       return { x: tree.data.x, z: tree.data.z };
     },
     hurt: (amount) => player.takeDamage(amount),
+    bots: () => bots.list.map((b) => ({ name: b.name, alive: b.alive, state: b.state, x: +b.position.x.toFixed(1), z: +b.position.z.toFixed(1),
+      health: Math.round(b.health), shield: Math.round(b.shield), weapon: b.weapon.type, target: b.target?.name || null })),
+    navInfo: () => ({ walkable: bots.nav.walk.reduce((a, b) => a + b, 0), cells: bots.nav.walk.length }),
+    setOptions: (o) => { Object.assign(options, o); renderOptions(); },
+    // Put a bot this far in front of you (for testing fights)
+    botInFront: (distance) => {
+      const b = bots.list.find((x) => x.alive);
+      const x = player.position.x - Math.sin(cam.yaw) * distance, z = player.position.z - Math.cos(cam.yaw) * distance;
+      const y = world.heightAt(x, z) + 1.2;
+      b.position.set(x, y, z); b.body.setTranslation({ x, y, z }, true);
+      b.yaw = Math.atan2(x - player.position.x, z - player.position.z); // facing you
+      return b.name;
+    },
+    killBots: (except = 0) => bots.list.filter((b) => b.alive).slice(except).forEach((b) => bots.damage(b, 999, null, 'test')),
     respawn: () => { player.respawn(); cam.yaw = start.yaw; },
     teleport: (x, z, yaw) => {
       const y = world.heightAt(x, z) + 1.0;
@@ -200,9 +270,12 @@ async function boot() {
       player.position.set(x, y, z);
       if (yaw !== undefined) cam.yaw = yaw;
     },
-    // Point the camera at a practice target (the camera looks along a line through the shoulder point)
+    freezeBots: (on) => { bots.frozen = on; },
+    clearBuilds: () => building.reset(),
+    // Point the camera at a practice target, or at a bot by name (the camera looks along a line through the shoulder point)
     aimAt: (i) => {
-      const t = targets.list[i].position;
+      const bot = typeof i === 'string' && bots.list.find((b) => b.name === i);
+      const t = bot ? bot.feet.add(new THREE.Vector3(0, 1.1, 0)) : targets.list[i].position;
       for (let k = 0; k < 3; k++) {
         const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
         const pivot = player.feet.add(new THREE.Vector3(0, SETTINGS.camera.height, 0)).addScaledVector(right, SETTINGS.camera.shoulder);

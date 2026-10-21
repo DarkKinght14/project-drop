@@ -31,6 +31,7 @@ try {
   await page.screenshot({ path: 'tests/output/menu.png' });
 
   await page.click('#playBtn');
+  await page.evaluate(() => window.__game.freezeBots(true)); // bots wait until their part of the test
   await page.waitForTimeout(800);
   const start = await page.evaluate(() => window.__game.player());
 
@@ -172,6 +173,48 @@ try {
   const wallAfter = builds.find((b) => b.type === 'wall');
   console.log(`shooting the wall: ${wallBefore?.hp} -> ${wallAfter ? wallAfter.hp : 'destroyed'}`);
   if (wallAfter && wallAfter.hp >= wallBefore.hp) fail('bullets did not damage the wall');
+
+  // ---------- Build 4: bots ----------
+  const nav = await game(() => window.__game.navInfo());
+  const botList = await game(() => window.__game.bots());
+  console.log(`bots: ${botList.length} spawned; navigation map has ${nav.walkable} walkable cells of ${nav.cells}`);
+  if (botList.length < 5) fail('bots did not spawn');
+  if (nav.walkable < 20000) fail("the bots' navigation map is almost empty");
+
+  // Fight one: a Legendary rifle against a bot 12 m away
+  await game(() => { window.__game.respawn(); window.__game.clearBuilds(); window.__game.give('ar', 4); });
+  inv = await game(() => window.__game.inventory());
+  const goldAr = inv.slots.findIndex((s) => s && s.type === 'ar' && s.rarity === 4);
+  await page.keyboard.press(`Digit${goldAr + 2}`);
+  await page.waitForTimeout(300);
+  const foe = await game(() => window.__game.botInFront(12));
+  const foeBefore = (await game(() => window.__game.bots())).find((b) => b.name === foe);
+  // 1. Your bullets hurt a bot (holding still for this part, so the test can aim)
+  await page.mouse.down();
+  for (let i = 0; i < 8; i++) { await game((n) => window.__game.aimAt(n), foe); await page.waitForTimeout(150); }
+  await page.mouse.up();
+  let foeNow = (await game(() => window.__game.bots())).find((b) => b.name === foe);
+  console.log(`bot fight: you shot ${foe} from ${foeBefore.health + foeBefore.shield} down to ${foeNow.alive ? foeNow.health + foeNow.shield : 'eliminated'}`);
+  if (foeNow.alive && foeNow.health + foeNow.shield >= foeBefore.health + foeBefore.shield) fail('bullets did not hurt the bot');
+  // 2. Bots fight back
+  await game(() => { window.__game.freezeBots(false); window.__game.botInFront(10); });
+  await page.waitForFunction(() => window.__game.player().health < 100 || window.__game.state() !== 'playing', null, { timeout: 30000 }).catch(() => {});
+  await page.screenshot({ path: 'tests/output/bot-fight.png' });
+  const me = await game(() => window.__game.player());
+  console.log(`bots fight back: you have ${Math.round(me.health)} health, ${Math.round(me.shield)} shield`);
+  if (me.health >= 100) fail('a bot right in front of you never shot you');
+
+  // Victory: when every bot is gone, the results screen says so
+  if ((await game(() => window.__game.state())) === 'playing') {
+    await game(() => window.__game.killBots());
+    await page.waitForFunction(() => window.__game.state() === 'over', null, { timeout: 20000 }).catch(() => {});
+    const title = await page.textContent('#resultTitle');
+    await page.screenshot({ path: 'tests/output/results.png' });
+    console.log(`end of match: "${title}", feed: ${await page.textContent('#killFeed')}`.slice(0, 200));
+    if (!title.includes('VICTORY')) fail('winning did not show the victory screen');
+  } else {
+    console.log('(you were eliminated by the bot during the fight test; skipping the victory check)');
+  }
   if (errors.length) fail('page errors:\n  ' + errors.join('\n  '));
   if (!process.exitCode) console.log('PASS  (screenshots in tests/output/)');
 } finally {

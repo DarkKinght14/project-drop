@@ -75,8 +75,33 @@ function show(id, visible) {
 
 let frames = 0, fpsTime = 0;
 // info: from weapons.hudInfo(); prompt: from loot.interact(); input: to check Tab
-// build: from building.hudInfo()
-export function updateHud(dt, player, cam, info, prompt, input, build) {
+// ---------- Kill feed ----------
+// Adds a line like "Raven eliminated Moss (Pump Shotgun)". cls: 'mine' (you did it) or 'me' (it was you).
+export function addKill(html, cls = '') {
+  const feed = $('killFeed');
+  const el = document.createElement('div');
+  el.innerHTML = html;
+  el.className = cls;
+  feed.prepend(el);
+  while (feed.children.length > 5) feed.lastChild.remove();
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 600); }, 6000);
+}
+export function clearKillFeed() { $('killFeed').innerHTML = ''; }
+
+// build: from building.hudInfo(); match: { alive, elims }
+export function updateHud(dt, player, cam, info, prompt, input, build, match) {
+  setText('aliveCount', String(match.alive));
+  setText('elimCount', String(match.elims));
+
+  // Red marker pointing toward whoever just shot you
+  const hitDir = $('hitDir');
+  if (player.hitTimer > 0 && player.hitFrom) {
+    const dx = player.hitFrom.x - player.position.x, dz = player.hitFrom.z - player.position.z;
+    const relative = Math.atan2(-dx, -dz) - cam.yaw; // 0 = straight ahead, positive = to your left
+    hitDir.style.transform = `rotate(${-relative}rad)`;
+    hitDir.style.opacity = String(Math.min(1, player.hitTimer));
+  } else if (hitDir.style.opacity !== '0') hitDir.style.opacity = '0';
+
   const P = SETTINGS.player;
   const inv = player.inventory;
   renderHotbar(inv);

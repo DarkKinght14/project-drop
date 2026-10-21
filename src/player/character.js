@@ -3,10 +3,17 @@
    A cartoon character built from simple shapes. Arms and legs hang from
    "pivots" (joints), so we can swing them to make a walking animation.
    The model faces +Z; the player code turns it to face the camera.
+   Each body part (both legs, both arms, the body) is baked into one shape
+   (core/bake.js), so a character costs only 5 draw calls.
    ===================================================================== */
 import * as THREE from 'three';
+import { bakeGeometry, bakedMaterial } from '../core/bake.js';
 
-const mat = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
+const materials = new Map();
+const mat = (color) => {
+  if (!materials.has(color)) materials.set(color, new THREE.MeshBasicMaterial({ color }));
+  return materials.get(color);
+};
 
 // Our own original outfit: "Scout", in an orange jacket and teal beanie.
 export const OUTFIT = {
@@ -17,8 +24,24 @@ export const OUTFIT = {
 function part(geometry, color, x, y, z) {
   const mesh = new THREE.Mesh(geometry, mat(color));
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
   return mesh;
+}
+
+// Merge the meshes directly inside a joint into one (keeping child joints, like the arms).
+// Shapes are remembered per outfit, so characters wearing the same outfit share them.
+const bakedParts = new Map();
+function bakeJoint(joint, key) {
+  const meshes = joint.children.filter((c) => c.isMesh);
+  if (!bakedParts.has(key)) {
+    const temp = new THREE.Group();
+    for (const m of meshes) temp.add(m.clone());
+    bakedParts.set(key, bakeGeometry(temp));
+  }
+  for (const m of meshes) joint.remove(m);
+  const baked = new THREE.Mesh(bakedParts.get(key), bakedMaterial);
+  baked.castShadow = true;
+  joint.add(baked);
+  return baked;
 }
 
 export function createCharacter(outfit = OUTFIT) {
@@ -67,10 +90,20 @@ export function createCharacter(outfit = OUTFIT) {
   hand.position.set(0, -0.62, 0.02);
   rightArm.add(hand);
 
+  // Bake every joint's pieces into one mesh each
+  const key = JSON.stringify(outfit);
+  const parts = [
+    bakeJoint(legs[0], key + 'leg'), bakeJoint(legs[1], key + 'leg'),
+    bakeJoint(rightArm, key + 'arm'), bakeJoint(leftArm, key + 'arm'),
+    bakeJoint(body, key + 'body'),
+  ];
+
   let phase = 0;
   return {
     root,
     hand,
+    // Far-away characters skip shadows (faster)
+    setShadows(on) { for (const p of parts) p.castShadow = on; },
     // speed: how fast we're moving; grounded: on the floor?; crouch: 0..1
     // pose: 'none' | 'gun' | 'item' | 'pick'; pitch: where the camera looks (up/down);
     // action: 0..1 for a pickaxe swing or a little kick when a gun fires
